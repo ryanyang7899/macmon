@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>macmon 远程监控</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  :root { --bg:#0f1115; --card:#181b21; --border:#262a33; --text:#e6e8eb; --dim:#8b93a1; --acc:#4f8cff; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, "PingFang SC", sans-serif; padding: 20px; }
+  h1 { font-size: 18px; display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+  .dot.on { background: #34d399; box-shadow: 0 0 6px #34d399; }
+  .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+  select, button { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+  select:focus, button:focus { outline: none; border-color: var(--acc); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .card .label { color: var(--dim); font-size: 12px; margin-bottom: 6px; }
+  .card .value { font-size: 22px; font-weight: 600; }
+  .card .sub { color: var(--dim); font-size: 11px; margin-top: 4px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+  .chart { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+  .chart h3 { font-size: 13px; color: var(--dim); padding: 4px 6px 8px; font-weight: 500; }
+  .chart div { height: 180px; }
+  .login { max-width: 300px; margin: 80px auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .login h2 { font-size: 16px; margin-bottom: 16px; }
+  .login input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 10px; border-radius: 6px; margin-bottom: 12px; font-size: 14px; }
+  .login button { width: 100%; }
+  .err { color: #f87171; font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div id="login" class="login" style="display:none">
+  <h2>macmon 看板登录</h2>
+  <input type="password" id="pwd" placeholder="输入访问密码">
+  <button onclick="login()">进入</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="main" style="display:none">
+  <h1>
+    <span class="dot" id="statusDot"></span>
+    macmon 远程监控
+  </h1>
+  <div class="toolbar">
+    <select id="deviceSelect" onchange="onDeviceChange()"></select>
+    <span id="deviceInfo" style="color:var(--dim);font-size:13px"></span>
+  </div>
+
+  <div class="cards" id="cards"></div>
+
+  <div class="grid">
+    <div class="chart"><h3>CPU 占用 (%)</h3><div id="ch_cpu"></div></div>
+    <div class="chart"><h3>CPU 温度 (°C)</h3><div id="ch_cputemp"></div></div>
+    <div class="chart"><h3>GPU 占用 (%)</h3><div id="ch_gpu"></div></div>
+    <div class="chart"><h3>GPU 温度 (°C)</h3><div id="ch_gputemp"></div></div>
+    <div class="chart"><h3>内存使用 (GB)</h3><div id="ch_mem"></div></div>
+    <div class="chart"><h3>网络速率 (MB/s)</h3><div id="ch_net"></div></div>
+    <div class="chart"><h3>磁盘 IO (MB/s)</h3><div id="ch_disk"></div></div>
+    <div class="chart"><h3>电池电量 (%)</h3><div id="ch_batt"></div></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let token = localStorage.getItem('macmon_token') || '';
+let currentDevice = '';
+const charts = {};
+const HIST_HOURS = 6;
+
+async function api(path) {
+  const res = await fetch(path, { headers: { 'X-Auth-Token': token } });
+  if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
+  if (!res.ok) throw new Error(res.status);
+  return res.json();
+}
+
+function showLogin() { $('#login').style.display='block'; $('#main').style.display='none'; }
+function hideLogin() { $('#login').style.display='none'; $('#main').style.display='block'; }
+
+async function login() {
+  const pwd = $('#pwd').value;
+  const res = await fetch('/api/devices', { headers: { 'X-Auth-Token': pwd } });
+  if (res.ok) { token = pwd; localStorage.setItem('macmon_token', pwd); $('#loginErr').textContent=''; init(); }
+  else { $('#loginErr').textContent = '密码错误'; }
+}
+
+function onDeviceChange() {
+  currentDevice = $('#deviceSelect').value;
+  localStorage.setItem('macmon_device', currentDevice);
+  refreshLatest();
+  refreshHistory();
+}
+
+function fmtGB(g) { return g >= 1024 ? (g/1024).toFixed(2)+' TB' : g.toFixed(1)+' GB'; }
+function fmtBps(b) { return b >= 1048576 ? (b/1048576).toFixed(1)+' MB/s' : (b/1024).toFixed(0)+' KB/s'; }
+function pct(v) { return ((v||0)*100).toFixed(0)+'%'; }
+
+const cardDefs = [
+  ['cpu','CPU 占用', d => pct(d.cpu.usage), d => `P核 ${pct(d.cpu.pCoreUsage)} / E核 ${pct(d.cpu.eCoreUsage)}`],
+  ['cput','CPU 温度', d => (d.cpu.temp||0).toFixed(1)+'°C', d => `负载 ${(d.cpu.load||[])[0]?.toFixed(1)||'-'}`],
+  ['gpu','GPU 占用', d => pct(d.gpu[0]?.utilization), d => d.gpu[0] ? `渲染 ${pct(d.gpu[0].renderUtilization)}` : ''],
+  ['gput','GPU 温度', d => (d.gpu[0]?.temperature||0).toFixed(1)+'°C', d => d.gpu[0]?.model||''],
+  ['mem','内存', d => fmtGB(d.memory.usedGB), d => `总 ${fmtGB(d.memory.totalGB)} · swap ${d.memory.swapUsedGB.toFixed(1)}G`],
+  ['net','网络', d => `↓ ${fmtBps(d.network.rxBps)}`, d => `↑ ${fmtBps(d.network.txBps)} · ${d.network.interface||''}`],
+  ['disk','磁盘 IO', d => `↓ ${fmtBps(d.disk.readBps)}`, d => `↑ ${fmtBps(d.disk.writeBps)}`],
+  ['batt','电池', d => d.battery.present ? d.battery.chargePercent.toFixed(0)+'%' : '—', d => d.battery.present ? `健康 ${d.battery.health}% · ${d.battery.powerSource}` : '无电池'],
+];
+
+function renderCards(d) {
+  $('#cards').innerHTML = cardDefs.map(([id,label,fn,sub]) => `
+    <div class="card"><div class="label">${label}</div><div class="value">${fn(d)}</div><div class="sub">${sub(d)}</div></div>`).join('');
+}
+
+async function refreshLatest() {
+  if (!currentDevice) return;
+  try {
+    const d = await api('/api/latest?device='+currentDevice);
+    $('#statusDot').classList.add('on');
+    const info = d.data.device || {};
+    const uptime = Math.floor(d.data.device?.uptimeSeconds||0);
+    $('#deviceInfo').textContent = `${info.chip||''} ${info.model||''} · ${info.os||''} · 已运行 ${Math.floor(uptime/86400)}天${Math.floor(uptime%86400/3600)}h`;
+    renderCards(d.data);
+  } catch(e) { /* 401 handled */ }
+}
+
+const chartDefs = [
+  ['ch_cpu','CPU 占用', ['cpu.usage'], 'percent'],
+  ['ch_cputemp','CPU 温度', ['cpu.temp'], 'temp'],
+  ['ch_gpu','GPU 占用', ['gpu.0.utilization'], 'percent'],
+  ['ch_gputemp','GPU 温度', ['gpu.0.temperature'], 'temp'],
+  ['ch_mem','内存使用', ['memory.usedGB'], 'gb'],
+  ['ch_net','网络速率', ['network.rxBps','network.txBps'], 'bps'],
+  ['ch_disk','磁盘 IO', ['disk.readBps','disk.writeBps'], 'bps'],
+  ['ch_batt','电池电量', ['battery.chargePercent'], 'percent'],
+];
+
+const chartNames = { 'network.rxBps':'↓ 下载','network.txBps':'↑ 上传','disk.readBps':'↓ 读','disk.writeBps':'↑ 写' };
+
+function initChart(el, title) {
+  if (charts[el]) return;
+  charts[el] = echarts.init(document.getElementById(el), 'dark');
+  charts[el].setOption({
+    grid: { left: 40, right: 12, top: 8, bottom: 24 },
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'time' },
+    yAxis: { type: 'value', scale: true, splitLine: { lineStyle: { color: '#242833' } } },
+    legend: { show: true, top: 0, textStyle: { color: '#8b93a1', fontSize: 11 } },
+    series: []
+  });
+}
+
+function conv(path, v) {
+  const fmt = chartDefs.find(c=>c[2].includes(path))?.[3]||'raw';
+  if (fmt==='percent') return (v||0)*100;
+  if (fmt==='bps') return (v||0)/1048576;
+  return v;
+}
+
+async function refreshHistory() {
+  if (!currentDevice) return;
+  try {
+    for (const [el, name, paths] of chartDefs) {
+      initChart(el, name);
+      const h = await api(`/api/history?device=${currentDevice}&hours=${HIST_HOURS}&paths=${paths.join(',')}`);
+      const series = paths.map(p => {
+        const name2 = chartNames[p] || name;
+        const data = h.series.filter(s => s.values[p]!==undefined).map(s => [s.ts*1000, conv(p, s.values[p])]);
+        return { name: name2, type: 'line', showSymbol: false, smooth: true, data, lineStyle:{width:1.5} };
+      });
+      charts[el].setOption({ series });
+    }
+  } catch(e) {}
+}
+
+async function loadDevices() {
+  try {
+    const devs = await api('/api/devices');
+    $('#deviceSelect').innerHTML = devs.map(d => `<option value="${d.name}">${d.name}</option>`).join('') || '<option value="">无设备</option>';
+    currentDevice = localStorage.getItem('macmon_device') || devs[0]?.name || '';
+    $('#deviceSelect').value = currentDevice;
+    if (currentDevice) { refreshLatest(); refreshHistory(); }
+    setInterval(refreshLatest, 3000);
+    setInterval(refreshHistory, 60000);
+  } catch(e) { /* 401 handled */ }
+}
+
+async function init() {
+  hideLogin();
+  await loadDevices();
+  window.addEventListener('resize', () => Object.values(charts).forEach(c => c.resize()));
+}
+
+// 启动: 已有 token 直接进, 否则尝试匿名(开发模式)
+(async () => {
+  if (token) { try { await init(); } catch(e) { showLogin(); } }
+  else {
+    // 先试探是否无密码 (开发模式)
+    try { const r = await fetch('/api/devices'); if (r.ok) { await init(); } else showLogin(); }
+    catch(e) { showLogin(); }
+  }
+})();
+</script>
+</body>
+</html>

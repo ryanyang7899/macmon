@@ -1,0 +1,12 @@
+# SwiftPM
+.build/
+.swiftpm/
+
+# 构建产物 (release 资产通过 GitHub Release 上传, 不纳入仓库)
+dist/
+
+# macOS
+.DS_Store
+
+# 含真实凭据, 不提交 (本地/NAS 部署用; 模板见 docker-compose.yml.example)
+server/docker-compose.yml

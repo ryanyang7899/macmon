@@ -23,11 +23,33 @@ final class AppModel: ObservableObject {
     private var transmitter: Transmitter?
     private let collectQueue = DispatchQueue(label: "macmon.collect", qos: .utility)
 
+    /// 写日志到 ~/Library/Logs/macmon-app.log (诊断用, 可从任意线程调用)
+    nonisolated private func log(_ msg: String) {
+        let line = "\(Date()) \(msg)\n"
+        let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("Logs")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("macmon-app.log")
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(line.data(using: .utf8) ?? Data())
+            try? handle.close()
+        } else {
+            try? line.data(using: .utf8)?.write(to: url)
+        }
+    }
+
     init() {
         self.config = AgentConfig.load()
+        log("init: server=\(config.serverURL ?? "nil") token=\((config.token?.isEmpty == false) ? "set" : "nil")")
         if config.serverURL?.isEmpty == false, let token = config.token, !token.isEmpty {
             self.isConnected = true
             self.statusText = "已连接"
+            // 已有配置时启动即自动恢复采集推送, 无需重新填写 (修复: 重启后不推送)
+            log("init: 配置有效, 自动 start()")
+            start()
+        } else {
+            log("init: 无有效配置, 跳过 start()")
         }
         self.isLaunchAtLogin = SMAppService.mainApp.status == .enabled
         checkForUpdates()
@@ -105,7 +127,11 @@ final class AppModel: ObservableObject {
 
     func start() {
         guard let urlStr = config.serverURL, let url = URL(string: urlStr),
-              let token = config.token, !token.isEmpty else { return }
+              let token = config.token, !token.isEmpty else {
+            log("start: guard 失败, 无法启动 url=\(config.serverURL ?? "nil")")
+            return
+        }
+        log("start: url=\(url.absoluteString) token=\(token)")
         stop()
         transmitter = Transmitter(serverURL: url, token: token, deviceID: config.deviceID)
         isConnected = true
@@ -128,6 +154,7 @@ final class AppModel: ObservableObject {
         collectQueue.async { [weak self] in
             guard let self else { return }
             let result = collectOnce(sampleIntervalSeconds: min(1.0, interval / 2))
+            self.log("collect: 采集完成 cpu=\(String(format: "%.2f", result.cpu.usage)) 准备推送")
             tx?.send(result)
             DispatchQueue.main.async {
                 self.latest = result

@@ -51,6 +51,12 @@ cat > "$APP_DIR/Contents/Info.plist" <<PLIST
     <true/>
     <key>NSSupportsAutomaticTermination</key>
     <false/>
+    <!-- 内网服务器走 http 明文 (Tailscale), 必须豁免 ATS 否则 URLSession 拒绝连接 -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
+    </dict>
 </dict>
 </plist>
 PLIST

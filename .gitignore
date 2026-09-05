@@ -10,3 +10,10 @@ dist/
 
 # 含真实凭据, 不提交 (本地/NAS 部署用; 模板见 docker-compose.yml.example)
 server/docker-compose.yml
+
+# 运行时数据 (含设备 token 与监控历史)
+server/data/
+
+# 本地编译产物
+server/server
+server/macmon-server

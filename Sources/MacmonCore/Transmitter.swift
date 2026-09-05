@@ -77,6 +77,15 @@ public final class Transmitter: @unchecked Sendable {
         }
     }
 
+    // 服务器在内网 (Tailscale), 不走系统代理: 代理默认不转发私有网段,
+    // 会让 URLSession 的推送静默失败 (curl 不受影响, 故表现为 App 无数据)
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.connectionProxyDictionary = [:]   // 空字典 = 禁用系统代理
+        config.timeoutIntervalForRequest = 5
+        return URLSession(configuration: config)
+    }()
+
     private func post(_ body: Data) -> Bool {
         var request = URLRequest(url: serverURL)
         request.httpMethod = "POST"
@@ -89,9 +98,13 @@ public final class Transmitter: @unchecked Sendable {
         var success = false
         let sema = DispatchSemaphore(value: 0)
 
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
+        let task = Transmitter.session.dataTask(with: request) { data, response, error in
             if error == nil, let http = response as? HTTPURLResponse, http.statusCode == 200 {
                 success = true
+            } else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                let err = error?.localizedDescription ?? "none"
+                Transmitter.log("post 失败 status=\(status) err=\(err) body=\(body.count)B")
             }
             done = true
             sema.signal()
@@ -103,4 +116,21 @@ public final class Transmitter: @unchecked Sendable {
         }
         return success
     }
+
+    private static func log(_ msg: String) {
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(msg)\n"
+        if let data = line.data(using: .utf8),
+           let handle = FileHandle(forWritingAtPath: logPath) {
+            defer { try? handle.close() }
+            handle.seekToEndOfFile()
+            handle.write(data)
+        } else {
+            try? line.data(using: .utf8)?.write(to: URL(fileURLWithPath: logPath))
+        }
+    }
+
+    private static let logPath = FileManager.default
+        .homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Logs/macmon-app.log")
+        .path
 }

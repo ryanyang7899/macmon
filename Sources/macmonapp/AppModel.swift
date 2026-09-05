@@ -19,9 +19,23 @@ final class AppModel: ObservableObject {
     @Published var updateAvailable: UpdateInfo?
     @Published var checkUpdateError: String?
 
+    // 被监控机器 (菜单栏实时显示)
+    @Published var monitorDeviceList: [MonitorDevice] = []
+    @Published var monitorSnapshots: [String: MonitorEntry] = [:]
+    @Published var monitorError: String?
+
     private var timer: Timer?
+    private var monitorTimer: Timer?
     private var transmitter: Transmitter?
     private let collectQueue = DispatchQueue(label: "macmon.collect", qos: .utility)
+
+    /// 监控请求专用 session: 禁用系统代理, 避免内网请求被代理劫持 (与 Transmitter 一致)
+    private static let monitorSession: URLSession = {
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.connectionProxyDictionary = [:]   // 空字典 = 禁用系统代理
+        cfg.timeoutIntervalForRequest = 5
+        return URLSession(configuration: cfg)
+    }()
 
     /// 写日志到 ~/Library/Logs/macmon-app.log (诊断用, 可从任意线程调用)
     nonisolated private func log(_ msg: String) {
@@ -52,7 +66,97 @@ final class AppModel: ObservableObject {
             log("init: 无有效配置, 跳过 start()")
         }
         self.isLaunchAtLogin = SMAppService.mainApp.status == .enabled
+        // 若已勾选被监控设备, 启动菜单栏监控轮询
+        if let sel = config.monitorDevices, !sel.isEmpty {
+            log("init: 已勾选被监控设备 \(sel.joined(separator: ",")), 启动监控轮询")
+            startMonitorTimer()
+            Task { await refreshMonitor() }
+        }
         checkForUpdates()
+    }
+
+    // MARK: - 被监控机器 (菜单栏实时显示)
+
+    func loadMonitorDevices() async {
+        monitorError = nil
+        guard let base = config.serverURL, let url = URL(string: base),
+              let token = config.token, !token.isEmpty else {
+            monitorError = "未配置服务器"
+            return
+        }
+        var req = URLRequest(url: url.appendingPathComponent("api/monitor/devices"))
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, resp) = try await Self.monitorSession.data(for: req)
+            guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+                monitorError = "获取设备列表失败 (HTTP \((resp as? HTTPURLResponse)?.statusCode ?? -1))"
+                return
+            }
+            let list = try JSONDecoder().decode([MonitorDevice].self, from: data)
+            self.monitorDeviceList = list
+            // 清理已不存在设备的勾选, 避免菜单栏显示幽灵设备
+            let names = Set(list.map(\.name))
+            if let sel = config.monitorDevices {
+                let valid = sel.filter { names.contains($0) }
+                if valid != sel {
+                    config.monitorDevices = valid
+                    try? config.save()
+                }
+            }
+        } catch {
+            monitorError = "获取设备列表失败: \(error.localizedDescription)"
+        }
+    }
+
+    /// 拉取勾选设备的实时快照 (5s 轮询)
+    func refreshMonitor() async {
+        let devices = config.monitorDevices ?? []
+        guard !devices.isEmpty, let base = config.serverURL, let url = URL(string: base),
+              let token = config.token, !token.isEmpty else {
+            monitorSnapshots = [:]
+            return
+        }
+        var req = URLRequest(url: url.appendingPathComponent("api/monitor/snapshots"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONEncoder().encode(["devices": devices])
+        do {
+            let (data, resp) = try await Self.monitorSession.data(for: req)
+            guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else { return }
+            self.monitorSnapshots = try JSONDecoder().decode([String: MonitorEntry].self, from: data)
+        } catch {
+            // 轮询失败静默, 等待下个周期; 不刷掉旧数据
+        }
+    }
+
+    /// 设置/取消勾选的被监控设备, 持久化并管理轮询
+    func setMonitorSelection(_ devices: [String]) {
+        config.monitorDevices = devices
+        try? config.save()
+        log("setMonitorSelection: \(devices.joined(separator: ","))")
+        if devices.isEmpty {
+            stopMonitorTimer()
+            monitorSnapshots = [:]
+        } else {
+            startMonitorTimer()
+            Task { await refreshMonitor() }
+        }
+    }
+
+    private func startMonitorTimer() {
+        monitorTimer?.invalidate()
+        monitorTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task { await self.refreshMonitor() }
+            }
+        }
+    }
+
+    private func stopMonitorTimer() {
+        monitorTimer?.invalidate()
+        monitorTimer = nil
     }
 
     // MARK: - 自动更新
@@ -115,7 +219,7 @@ final class AppModel: ObservableObject {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(["setup_key": setupKey, "name": deviceName])
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await Self.monitorSession.data(for: req)
         guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
@@ -183,4 +287,27 @@ final class AppModel: ObservableObject {
         _ = gethostname(&buf, buf.count)
         return String(cString: buf)
     }
+}
+
+// MARK: - 监控数据模型 (server /api/monitor/*)
+
+/// GET /api/monitor/devices 返回的设备条目
+struct MonitorDevice: Decodable {
+    let name: String
+    let last_seen: Int64
+    let suspended: Bool
+}
+
+/// 设备推送的一条原始采样 (与 MetricPayload 对应)
+struct MonitorSnapshot: Decodable {
+    let device_id: String
+    let ts: Int64
+    let data: ProbeResult
+}
+
+/// POST /api/monitor/snapshots 返回的某设备条目 (latest 可能为 null, 无数据时)
+struct MonitorEntry: Decodable {
+    let latest: MonitorSnapshot?
+    let last_seen: Int64
+    let suspended: Bool
 }

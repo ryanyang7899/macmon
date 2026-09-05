@@ -11,18 +11,21 @@ public struct AgentConfig: Codable {
     public var interval: Double          // 采集周期 (秒)
     public var serverURL: String?        // 推送服务器地址
     public var token: String?            // 设备鉴权 token
+    public var monitorDevices: [String]? // 勾选的被监控设备 (菜单栏实时显示), nil=未设置
 
     public static func load() -> AgentConfig {
         let file = configFileURL()
         if let data = try? Data(contentsOf: file),
-           let cfg = try? JSONDecoder().decode(AgentConfig.self, from: data) {
+           var cfg = try? JSONDecoder().decode(AgentConfig.self, from: data) {
+            if cfg.monitorDevices == nil { cfg.monitorDevices = [] }   // 兼容旧配置
             return cfg
         }
         // 首次运行: 生成配置
         let cfg = AgentConfig(deviceID: UUID().uuidString,
                               interval: 5.0,
                               serverURL: nil,
-                              token: nil)
+                              token: nil,
+                              monitorDevices: [])
         try? cfg.save()
         return cfg
     }

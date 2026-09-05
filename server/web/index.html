@@ -29,6 +29,33 @@
   .login input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 10px; border-radius: 6px; margin-bottom: 12px; font-size: 14px; }
   .login button { width: 100%; }
   .err { color: #f87171; font-size: 12px; margin-top: 8px; }
+  /* 设备管理 */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .tab { border: none; background: transparent; color: var(--dim); padding: 10px 16px; border-bottom: 2px solid transparent; cursor: pointer; }
+  .tab.active { color: var(--text); border-bottom-color: var(--acc); }
+  .admin-section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .admin-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .admin-head h2 { font-size: 14px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--dim); font-weight: 500; font-size: 12px; }
+  td button { padding: 4px 8px; font-size: 12px; margin-right: 4px; }
+  td button.danger { color: #f87171; }
+  .empty { color: var(--dim); text-align: center; padding: 20px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; background: var(--border); color: var(--dim); }
+  .badge.on { background: rgba(52,211,153,.15); color: #34d399; }
+  .badge.off { background: rgba(248,113,113,.15); color: #f87171; }
+  .setup-key-row { margin-top: 12px; padding: 10px; background: var(--bg); border: 1px dashed var(--border); border-radius: 8px; font-size: 13px; }
+  .setup-key-row code { color: var(--acc); }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 420px; width: 90%; }
+  .modal-box h3 { font-size: 16px; margin-bottom: 12px; }
+  .modal-box p { margin-bottom: 10px; font-size: 13px; }
+  .modal-box code { display: inline-block; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 16px; letter-spacing: 1px; color: var(--acc); }
+  .modal-box .hint { color: var(--dim); font-size: 12px; }
+  .modal-box button { margin-right: 6px; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--acc); color: var(--text); padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 200; }
+  .toast.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -45,24 +72,75 @@
     <span class="dot" id="statusDot"></span>
     macmon 远程监控
   </h1>
-  <div class="toolbar">
-    <select id="deviceSelect" onchange="onDeviceChange()"></select>
-    <span id="deviceInfo" style="color:var(--dim);font-size:13px"></span>
+  <div class="tabs">
+    <button class="tab active" id="tabMonitor" onclick="showView('monitor')">监控</button>
+    <button class="tab" id="tabAdmin" onclick="showView('admin')">设备管理</button>
   </div>
 
-  <div class="cards" id="cards"></div>
+  <div id="viewMonitor">
+    <div class="toolbar">
+      <select id="deviceSelect" onchange="onDeviceChange()"></select>
+      <span id="deviceInfo" style="color:var(--dim);font-size:13px"></span>
+    </div>
 
-  <div class="grid">
-    <div class="chart"><h3>CPU 占用 (%)</h3><div id="ch_cpu"></div></div>
-    <div class="chart"><h3>CPU 温度 (°C)</h3><div id="ch_cputemp"></div></div>
-    <div class="chart"><h3>GPU 占用 (%)</h3><div id="ch_gpu"></div></div>
-    <div class="chart"><h3>GPU 温度 (°C)</h3><div id="ch_gputemp"></div></div>
-    <div class="chart"><h3>内存使用 (GB)</h3><div id="ch_mem"></div></div>
-    <div class="chart"><h3>网络速率 (MB/s)</h3><div id="ch_net"></div></div>
-    <div class="chart"><h3>磁盘 IO (MB/s)</h3><div id="ch_disk"></div></div>
-    <div class="chart"><h3>电池电量 (%)</h3><div id="ch_batt"></div></div>
+    <div class="cards" id="cards"></div>
+
+    <div class="grid">
+      <div class="chart"><h3>CPU 占用 (%)</h3><div id="ch_cpu"></div></div>
+      <div class="chart"><h3>CPU 温度 (°C)</h3><div id="ch_cputemp"></div></div>
+      <div class="chart"><h3>GPU 占用 (%)</h3><div id="ch_gpu"></div></div>
+      <div class="chart"><h3>GPU 温度 (°C)</h3><div id="ch_gputemp"></div></div>
+      <div class="chart"><h3>内存使用 (GB)</h3><div id="ch_mem"></div></div>
+      <div class="chart"><h3>网络速率 (MB/s)</h3><div id="ch_net"></div></div>
+      <div class="chart"><h3>磁盘 IO (MB/s)</h3><div id="ch_disk"></div></div>
+      <div class="chart"><h3>电池电量 (%)</h3><div id="ch_batt"></div></div>
+    </div>
+  </div>
+
+  <div id="viewAdmin" style="display:none">
+    <div class="admin-section">
+      <div class="admin-head">
+        <h2>待注册设备</h2>
+        <div>
+          <button onclick="refreshAdmin()">刷新</button>
+          <button onclick="clearUnregistered()">清空列表</button>
+        </div>
+      </div>
+      <table id="unregTable">
+        <thead><tr><th>设备名</th><th>IP</th><th>首次上报</th><th>最近上报</th><th>次数</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="setup-key-row" id="setupKeyRow" style="display:none">
+        共享注册码 (SETUP_KEY):
+        <code id="setupKeyValue"></code>
+        <button onclick="copyText(document.getElementById('setupKeyValue').textContent)">复制</button>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <div class="admin-head">
+        <h2>已注册设备</h2>
+        <button onclick="refreshAdmin()">刷新</button>
+      </div>
+      <table id="devTable">
+        <thead><tr><th>名称</th><th>IP</th><th>状态</th><th>最后上报</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </div>
 </div>
+
+<div id="codeModal" class="modal">
+  <div class="modal-box">
+    <h3>设备注册码</h3>
+    <p>设备名: <b id="codeDevice"></b></p>
+    <p>注册码: <code id="codeValue"></code></p>
+    <p class="hint">有效期 30 分钟。将此码填入该设备 config.json 的 token 字段,设备下一次推送即自动注册完成。</p>
+    <button onclick="copyText(document.getElementById('codeValue').textContent)">复制注册码</button>
+    <button onclick="closeModal()">关闭</button>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -76,6 +154,145 @@ async function api(path) {
   if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
   if (!res.ok) throw new Error(res.status);
   return res.json();
+}
+
+// ---------- 设备管理 ----------
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const jq = s => JSON.stringify(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+const fmtTime = ts => {
+  if (!ts) return '-';
+  const d = new Date(ts*1000), pad = n => String(n).padStart(2,'0');
+  return `${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+async function copyText(txt) {
+  try { await navigator.clipboard.writeText(txt); toast('已复制'); }
+  catch(e) { toast('复制失败'); }
+}
+function closeModal() { $('#codeModal').style.display = 'none'; }
+
+// 通用请求 (支持 POST/DELETE 带 body, 与 api() 同鉴权)
+async function api2(path, method = 'GET', body) {
+  const opt = { method, headers: { 'X-Auth-Token': token } };
+  if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  const res = await fetch(path, opt);
+  if (res.status === 401) { showLogin(); throw new Error('unauthorized'); }
+  const text = await res.text();
+  if (!res.ok) throw new Error(text || res.status);
+  return text ? JSON.parse(text) : null;
+}
+
+function showView(v) {
+  $('#viewMonitor').style.display = v === 'monitor' ? 'block' : 'none';
+  $('#viewAdmin').style.display = v === 'admin' ? 'block' : 'none';
+  $('#tabMonitor').classList.toggle('active', v === 'monitor');
+  $('#tabAdmin').classList.toggle('active', v === 'admin');
+  if (v === 'admin') refreshAdmin();
+}
+
+async function refreshAdmin() {
+  try {
+    await Promise.all([loadUnregistered(), loadDevicesAdmin()]);
+    const sk = await api('/api/setup-key');
+    if (sk && sk.setup_key) {
+      $('#setupKeyRow').style.display = 'block';
+      $('#setupKeyValue').textContent = sk.setup_key;
+    }
+  } catch(e) {}
+}
+
+async function loadUnregistered() {
+  const list = await api('/api/unregistered');
+  const tb = $('#unregTable tbody');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="6" class="empty">暂无未注册设备</td></tr>'; return; }
+  tb.innerHTML = list.map(p => `
+    <tr>
+      <td>${esc(p.name)}</td>
+      <td>${esc(p.ip)}</td>
+      <td>${fmtTime(p.first_seen)}</td>
+      <td>${fmtTime(p.last_seen)}</td>
+      <td>${p.count}</td>
+      <td><button onclick="issueCode(${jq(p.name)})">生成注册码</button></td>
+    </tr>`).join('');
+}
+
+async function loadDevicesAdmin() {
+  const devs = await api('/api/devices');
+  const tb = $('#devTable tbody');
+  if (!devs.length) { tb.innerHTML = '<tr><td colspan="5" class="empty">暂无设备</td></tr>'; return; }
+  tb.innerHTML = devs.map(d => {
+    const online = (Date.now()/1000 - d.last_seen) < 30;
+    const badge = d.suspended ? '<span class="badge off">已禁用</span>'
+      : online ? '<span class="badge on">在线</span>' : '<span class="badge">离线</span>';
+    return `
+    <tr>
+      <td>${esc(d.name)}</td>
+      <td>${esc(d.ip)}</td>
+      <td>${badge}</td>
+      <td>${fmtTime(d.last_seen)}</td>
+      <td>
+        <button title="复制" onclick="copyText(${jq(d.token)})">复制 token</button>
+        <button onclick="renameDev(${jq(d.name)})">重命名</button>
+        <button onclick="rotateDev(${jq(d.name)})">轮换</button>
+        <button onclick="suspendDev(${jq(d.name)}, ${d.suspended})">${d.suspended ? '启用' : '禁用'}</button>
+        <button class="danger" onclick="delDev(${jq(d.name)}, false)">注销</button>
+        <button class="danger" onclick="delDev(${jq(d.name)}, true)">彻底删除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function issueCode(name) {
+  try {
+    const pc = await api2('/api/pending-code', 'POST', { device: name });
+    $('#codeDevice').textContent = pc.device;
+    $('#codeValue').textContent = pc.code;
+    $('#codeModal').style.display = 'flex';
+  } catch(e) { toast(e.message || '生成失败'); }
+}
+
+async function clearUnregistered() {
+  if (!confirm('清空未注册设备列表?')) return;
+  try { await api2('/api/clear-unregistered', 'POST'); toast('已清空'); refreshAdmin(); }
+  catch(e) { toast(e.message || '失败'); }
+}
+
+async function delDev(name, purge) {
+  const msg = purge ? `彻底删除设备「${name}」及其全部历史数据?` : `注销设备「${name}」(保留数据)?`;
+  if (!confirm(msg)) return;
+  try { await api2('/api/device/delete', 'POST', { name, purge }); toast(purge ? '已彻底删除' : '已注销'); refreshAdmin(); }
+  catch(e) { toast(e.message || '失败'); }
+}
+
+async function renameDev(name) {
+  const nn = prompt('新设备名:', name);
+  if (!nn || nn === name) return;
+  try { await api2('/api/device/rename', 'POST', { name, new_name: nn }); toast('已重命名'); refreshAdmin(); }
+  catch(e) { toast(e.message || '失败'); }
+}
+
+async function rotateDev(name) {
+  if (!confirm(`轮换设备「${name}」的 token?旧 token 将立即失效。`)) return;
+  try {
+    const r = await api2('/api/device/rotate-token', 'POST', { name });
+    toast(`新 token: ${r.token}`);
+  } catch(e) { toast(e.message || '失败'); }
+}
+
+async function suspendDev(name, suspended) {
+  try {
+    await api2('/api/device/suspend', 'POST', { name, suspended: !suspended });
+    toast(suspended ? '已启用' : '已禁用');
+    refreshAdmin();
+  } catch(e) { toast(e.message || '失败'); }
 }
 
 function showLogin() { $('#login').style.display='block'; $('#main').style.display='none'; }

@@ -127,6 +127,17 @@
         <tbody></tbody>
       </table>
     </div>
+
+    <div class="admin-section">
+      <div class="admin-head">
+        <h2>历史数据留存</h2>
+      </div>
+      <p class="hint" style="margin:0 0 8px">监控历史数据按天保存, 超过留存窗口的文件将被立即删除以释放存储。当前留存: <b id="retentionValue">-</b> 天。</p>
+      <div style="display:flex; gap:8px; align-items:center">
+        <input type="number" id="retentionInput" min="1" max="365" style="width:90px; padding:4px 8px" title="1-365 天">
+        <button onclick="openRetentionConfirm()">保存</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -138,6 +149,16 @@
     <p class="hint">有效期 30 分钟。将此码填入该设备 config.json 的 token 字段,设备下一次推送即自动注册完成。</p>
     <button onclick="copyText(document.getElementById('codeValue').textContent)">复制注册码</button>
     <button onclick="closeModal()">关闭</button>
+  </div>
+</div>
+
+<div id="retentionModal" class="modal">
+  <div class="modal-box">
+    <h3>确认修改历史留存时间</h3>
+    <p>当前留存 <b id="retCur">-</b> 天 → 新留存 <b id="retNew">-</b> 天</p>
+    <p style="color:#f87171; font-size:13px">⚠️ 窗口外(超过 <b id="retNewDays">-</b> 天)的全部历史监控数据将被<strong>立即删除, 不可恢复</strong>。</p>
+    <button class="danger" onclick="saveRetention()">确认修改</button>
+    <button onclick="closeRetentionModal()">取消</button>
   </div>
 </div>
 <div id="toast" class="toast"></div>
@@ -178,6 +199,37 @@ async function copyText(txt) {
   catch(e) { toast('复制失败'); }
 }
 function closeModal() { $('#codeModal').style.display = 'none'; }
+function closeRetentionModal() { $('#retentionModal').style.display = 'none'; }
+$('#retentionModal').addEventListener('click', e => { if (e.target === $('#retentionModal')) closeRetentionModal(); });
+
+async function loadRetention() {
+  try {
+    const r = await api2('/api/admin/retention');
+    $('#retentionValue').textContent = r.retention_days;
+    $('#retentionInput').value = r.retention_days;
+  } catch(e) { toast(e.message || '获取留存设置失败'); }
+}
+
+// 打开二次确认弹窗 (校验输入并预填当前值)
+function openRetentionConfirm() {
+  const v = parseInt($('#retentionInput').value, 10);
+  if (!v || v < 1 || v > 365) { toast('请输入 1-365 之间的天数'); return; }
+  const cur = parseInt($('#retentionValue').textContent, 10) || '-';
+  $('#retCur').textContent = cur;
+  $('#retNew').textContent = v;
+  $('#retNewDays').textContent = v;
+  $('#retentionModal').style.display = 'flex';
+}
+
+async function saveRetention() {
+  const v = parseInt($('#retentionInput').value, 10);
+  try {
+    const r = await api2('/api/admin/retention', 'POST', { retention_days: v });
+    $('#retentionValue').textContent = r.retention_days;
+    closeRetentionModal();
+    toast(`已设置留存 ${r.retention_days} 天 · 立即删除 ${r.deleted} 个历史文件`);
+  } catch(e) { toast(e.message || '设置失败'); }
+}
 
 // 通用请求 (支持 POST/DELETE 带 body, 与 api() 同鉴权)
 async function api2(path, method = 'GET', body) {
@@ -200,7 +252,7 @@ function showView(v) {
 
 async function refreshAdmin() {
   try {
-    await Promise.all([loadUnregistered(), loadDevicesAdmin()]);
+    await Promise.all([loadUnregistered(), loadDevicesAdmin(), loadRetention()]);
     const sk = await api('/api/setup-key');
     if (sk && sk.setup_key) {
       $('#setupKeyRow').style.display = 'block';

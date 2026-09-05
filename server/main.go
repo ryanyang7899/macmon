@@ -7,7 +7,7 @@
 //   DATA_DIR      数据目录          (默认 ./data)
 //   WEB_PASSWORD  看板登录密码      (默认空=不鉴权, 生产环境必须设置)
 //   MACMON_DEVICES 预配设备 "name=token;name2=token2" (默认空=接受任意 token, 开发用)
-//   RETENTION_DAYS 历史保留天数     (默认 7)
+//   RETENTION_DAYS 历史保留天数     (默认 1, 首次启动的种子; 之后以管理页面设置 + settings.json 为准)
 //
 // 接口:
 //   POST /api/metrics            Agent 推送 (Bearer token; 待注册码首推自动注册)
@@ -22,6 +22,8 @@
 //   POST /api/device/rename      重命名设备 (需要看板密码)
 //   POST /api/device/rotate-token 轮换设备 token (需要看板密码)
 //   POST /api/device/suspend     禁用/启用设备 (需要看板密码)
+//   GET  /api/monitor/devices    设备列表脱敏 (agent token)
+//   POST /api/monitor/snapshots  批量最新快照 (agent token)
 //   GET  /api/latest?device=xx   最新快照 (需要看板密码)
 //   GET  /api/history?device=xx&hours=24&paths=cpu.usage,cpu.temp  历史序列
 //   GET  /                        看板页面 (静态文件)
@@ -111,6 +113,12 @@ func NewStore(dir string, retentionDays int) (*Store, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "latest"), 0o755); err != nil {
 		return nil, err
 	}
+	// 留存天数优先级: settings.json (运行期事实来源) > env RETENTION_DAYS > 默认 1 天
+	if n, ok := s.loadSettings(); ok {
+		s.retentionDays = n
+	} else if s.retentionDays <= 0 {
+		s.retentionDays = 1
+	}
 	// 加载设备表
 	devFile := filepath.Join(dir, "devices.json")
 	if data, err := ioutil.ReadFile(devFile); err == nil {
@@ -192,6 +200,13 @@ func (s *Store) deviceByToken(token string) (Device, bool) {
 	if !ok {
 		return Device{}, false
 	}
+	d, ok := s.devices[name]
+	return d, ok
+}
+
+func (s *Store) deviceByName(name string) (Device, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	d, ok := s.devices[name]
 	return d, ok
 }
@@ -679,10 +694,13 @@ func (s *Store) history(deviceID, pathsStr string, hours int, maxPoints int) His
 	return resp
 }
 
-// 删除超过 retentionDays 的历史文件
-func (s *Store) cleanupOldFiles() {
+// 删除超过 retentionDays 的历史文件, 返回删除的文件数
+func (s *Store) cleanupOldFiles() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	cutoff := time.Now().Add(-time.Duration(s.retentionDays) * time.Hour * 24)
 	histRoot := filepath.Join(s.dir, "history")
+	deleted := 0
 	devs, _ := ioutil.ReadDir(histRoot)
 	for _, dev := range devs {
 		if !dev.IsDir() {
@@ -696,9 +714,56 @@ func (s *Store) cleanupOldFiles() {
 			}
 			if day.Before(cutoff) {
 				_ = os.Remove(filepath.Join(histRoot, dev.Name(), f.Name()))
+				deleted++
 			}
 		}
 	}
+	return deleted
+}
+
+// 后台定时清理: 保证窗口外的历史数据持续销毁, 不依赖重启或手动设置
+func (s *Store) runCleanupLoop() {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.cleanupOldFiles()
+	}
+}
+
+// ---------- 留存天数设置 (settings.json 持久化) ----------
+
+func (s *Store) loadSettings() (int, bool) {
+	data, err := ioutil.ReadFile(filepath.Join(s.dir, "settings.json"))
+	if err != nil {
+		return 0, false
+	}
+	var st struct {
+		RetentionDays int `json:"retention_days"`
+	}
+	if json.Unmarshal(data, &st) != nil || st.RetentionDays < 1 || st.RetentionDays > 365 {
+		return 0, false
+	}
+	return st.RetentionDays, true
+}
+
+func (s *Store) saveSettings() {
+	data, _ := json.Marshal(map[string]int{"retention_days": s.retentionDays})
+	_ = ioutil.WriteFile(filepath.Join(s.dir, "settings.json"), data, 0o644)
+}
+
+func (s *Store) retentionDaysValue() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.retentionDays
+}
+
+// 设置留存天数并立即清理窗口外数据, 返回删除的历史文件数
+func (s *Store) setRetentionDays(n int) int {
+	s.mu.Lock()
+	s.retentionDays = n
+	s.saveSettings()
+	s.mu.Unlock()
+	return s.cleanupOldFiles()
 }
 
 // ---------- 鉴权 ----------
@@ -728,6 +793,18 @@ func requireWebAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// 有效 agent token 即可访问 (只读监控接口, 供 App 查看被监控机器)
+func (s *Store) requireAgentAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if _, ok := s.deviceByToken(token); !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // ---------- main ----------
 
 func main() {
@@ -735,12 +812,14 @@ func main() {
 	dataDir := envOr("DATA_DIR", "./data")
 	webPassword = os.Getenv("WEB_PASSWORD")
 	provision := os.Getenv("MACMON_DEVICES")
-	retention, _ := strconv.Atoi(envOr("RETENTION_DAYS", "7"))
+	retention, _ := strconv.Atoi(envOr("RETENTION_DAYS", ""))
 
 	store, err := NewStore(dataDir, retention)
 	if err != nil {
 		log.Fatalf("存储初始化失败: %v", err)
 	}
+	// 运行期持续清理窗口外的历史数据 (默认 1 天, 可在管理页面修改)
+	go store.runCleanupLoop()
 	if provision != "" {
 		names := store.provisionDevices(provision)
 		store.saveDevices()
@@ -938,6 +1017,67 @@ func main() {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+	}))
+
+	// 只读监控接口 (agent token 鉴权, 供 App 菜单栏查看被监控机器)
+	mux.HandleFunc("GET /api/monitor/devices", store.requireAgentAuth(func(w http.ResponseWriter, r *http.Request) {
+		devs := store.allDevices()
+		list := make([]map[string]any, 0, len(devs))
+		for _, d := range devs {
+			list = append(list, map[string]any{
+				"name":      d.Name,
+				"ip":        d.IP,
+				"last_seen": d.LastSeen,
+				"suspended": d.Suspended,
+			})
+		}
+		writeJSON(w, list)
+	}))
+
+	mux.HandleFunc("POST /api/monitor/snapshots", store.requireAgentAuth(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Devices []string `json:"devices"`
+		}
+		defer r.Body.Close()
+		if json.NewDecoder(r.Body).Decode(&req) != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		out := map[string]any{}
+		for _, name := range req.Devices {
+			d, ok := store.deviceByName(name)
+			if !ok {
+				continue
+			}
+			entry := map[string]any{
+				"last_seen": d.LastSeen,
+				"suspended": d.Suspended,
+			}
+			if data, ok := store.getLatest(name); ok {
+				entry["latest"] = json.RawMessage(data)
+			} else {
+				entry["latest"] = nil
+			}
+			out[name] = entry
+		}
+		writeJSON(w, out)
+	}))
+
+	// 历史数据留存天数 (管理页面可改)
+	mux.HandleFunc("GET /api/admin/retention", requireWebAuth(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"retention_days": store.retentionDaysValue()})
+	}))
+	mux.HandleFunc("POST /api/admin/retention", requireWebAuth(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			RetentionDays int `json:"retention_days"`
+		}
+		defer r.Body.Close()
+		if json.NewDecoder(r.Body).Decode(&req) != nil || req.RetentionDays < 1 || req.RetentionDays > 365 {
+			http.Error(w, "retention_days must be 1-365", http.StatusBadRequest)
+			return
+		}
+		deleted := store.setRetentionDays(req.RetentionDays)
+		writeJSON(w, map[string]any{"retention_days": req.RetentionDays, "deleted": deleted})
 	}))
 
 	// 看板 API

@@ -1,0 +1,26 @@
+# macmon-server NAS 部署模板
+# 使用: cp docker-compose.yml.example docker-compose.yml 并填入真实值
+#
+# 三个环境变量都要改成你自己的:
+#   MACMON_DEVICES : 预配设备, 格式 name=token; 多个用分号分隔
+#   WEB_PASSWORD   : 看板登录密码
+#   SETUP_KEY      : 新设备注册码 (App 填这个自动接入)
+
+services:
+  macmon-server:
+    build: .
+    container_name: macmon-server
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DATA_DIR=/data
+      - RETENTION_DAYS=7
+      - MACMON_DEVICES=your-device-name=change-me-token
+      - WEB_PASSWORD=change-me-password
+      - SETUP_KEY=change-me-setup-key
+    volumes:
+      - macmon-data:/data
+
+volumes:
+  macmon-data:

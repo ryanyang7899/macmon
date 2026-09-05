@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.macmon.agent</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__BINARY_PATH__</string>
+        <string>--agent</string>
+        <string>--out</string>
+        <string>__LOG_FILE__</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <__RUN_AT_LOAD__/>
+
+    <key>KeepAlive</key>
+    <__KEEP_ALIVE__/>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+
+    <key>StandardOutPath</key>
+    <string>__LOG_FILE__</string>
+
+    <key>StandardErrorPath</key>
+    <string>__LOG_FILE__.err</string>
+</dict>
+</plist>

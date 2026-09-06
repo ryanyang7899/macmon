@@ -195,8 +195,26 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
 async function copyText(txt) {
-  try { await navigator.clipboard.writeText(txt); toast('已复制'); }
-  catch(e) { toast('复制失败'); }
+  // 管理面板是 http (非安全上下文), navigator.clipboard 不可用, 需降级到 execCommand
+  try {
+    await navigator.clipboard.writeText(txt);
+    toast('已复制');
+  } catch(e) {
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    try {
+      document.execCommand('copy');
+      toast('已复制');
+    } catch(err) {
+      toast('复制失败');
+    }
+    document.body.removeChild(ta);
+  }
 }
 function closeModal() { $('#codeModal').style.display = 'none'; }
 function closeRetentionModal() { $('#retentionModal').style.display = 'none'; }

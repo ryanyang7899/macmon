@@ -17,36 +17,41 @@ struct MonitorWindowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标题栏行: 标题 + 固定/关闭按钮 (系统标题栏已透明化, 此行即标题栏)
-            HStack(spacing: 10) {
-                Text("实时监控")
-                    .font(.headline)
+            // 迷你控制行: 仅固定/关闭按钮 (标题文字移除, 系统标题栏预留区已被吃掉)
+            HStack(spacing: 6) {
                 Spacer()
                 Button {
                     pinned.toggle()
                 } label: {
                     Image(systemName: pinned ? "pin.fill" : "pin")
+                        .font(.system(size: 11))
                 }
                 .buttonStyle(.borderless)
+                .controlSize(.small)
                 .help(pinned ? "取消固定 (不再置顶)" : "固定在所有窗口最上层")
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark")
+                        .font(.system(size: 11))
                 }
                 .buttonStyle(.borderless)
+                .controlSize(.small)
                 .help("关闭窗口")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 2)
 
             ScrollView {
                 MonitorContentView(model: model)
-                    .padding(12)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 12)
             }
         }
         .frame(width: 320)
-        // 玻璃背景铺满整窗 (含标题栏区域)
+        .ignoresSafeArea(edges: .top)   // 吃掉系统标题栏预留区, 内容直达窗口顶部
+        // 玻璃背景铺满整窗
         .background(FrostedGlassBackground().ignoresSafeArea())
         .background(WindowAccessor(window: $window, configure: configureWindow))
         .onChange(of: pinned) { _ in applyLevel() }

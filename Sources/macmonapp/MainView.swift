@@ -48,5 +48,8 @@ struct MainView: View {
             SettingsView(model: model)
         }
         .frame(minWidth: 480, idealWidth: 500, minHeight: 500, idealHeight: 640)
+        // 设置窗口打开期间占 Dock (regular), 关闭窗口即收回 (accessory), 后台继续运行
+        .onAppear { NSApp.setActivationPolicy(.regular) }
+        .onDisappear { NSApp.setActivationPolicy(.accessory) }
     }
 }

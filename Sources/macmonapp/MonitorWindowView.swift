@@ -17,7 +17,7 @@ struct MonitorWindowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 迷你控制行: 仅固定/关闭按钮 (标题文字移除, 系统标题栏预留区已被吃掉)
+            // 迷你控制行: 仅固定/关闭按钮 (位于安全区内, 不会被系统标题栏层遮挡)
             HStack(spacing: 6) {
                 Spacer()
                 Button {
@@ -40,7 +40,7 @@ struct MonitorWindowView: View {
                 .help("关闭窗口")
             }
             .padding(.horizontal, 10)
-            .padding(.top, 4)
+            .padding(.top, 2)
             .padding(.bottom, 2)
 
             ScrollView {
@@ -50,18 +50,27 @@ struct MonitorWindowView: View {
             }
         }
         .frame(width: 320)
-        // 玻璃背景铺满整窗
+        // 玻璃背景铺满整窗 (含标题栏区域, 标题栏已透明化)
         .background(FrostedGlassBackground().ignoresSafeArea())
         .background(WindowAccessor(window: $window, configure: configureWindow))
         .onChange(of: pinned) { _ in applyLevel() }
         .onAppear { applyLevel() }
     }
 
-    /// 无边框窗口: 彻底移除系统标题栏 (红绿灯区域不复存在), 玻璃背景铺满, 背景可拖动
+    /// 标准 titled 窗口: 保留系统圆角与正确的焦点描边 (无边框窗口获焦时会出现方角强调层)
+    /// 标题栏透明化 + 隐藏红绿灯 + 背景可拖动; 标题栏自身透明不占视觉空间
     private func configureWindow(_ w: NSWindow) {
-        w.styleMask = [.borderless, .resizable]
         w.isOpaque = false
         w.backgroundColor = .clear
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.styleMask.insert(.fullSizeContentView)
+        if #available(macOS 26.0, *) {
+            w.titlebarSeparatorStyle = .none
+        }
+        w.standardWindowButton(.closeButton)?.isHidden = true
+        w.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        w.standardWindowButton(.zoomButton)?.isHidden = true
         w.isMovableByWindowBackground = true
     }
 

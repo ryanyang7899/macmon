@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 
 APP_NAME="Macmon"
 BUNDLE_ID="com.macmon.app"
-VERSION="0.0.3"
+VERSION="0.0.4"
 ICON_PATH="$(pwd)/Resources/AppIcon.icns"
 
 echo "==> 构建 release (含 macmonapp)"

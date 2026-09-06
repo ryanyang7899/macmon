@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Darwin
 
 /// 筛选 SMC 温度 key: T 开头的传感器类 key
 public func isTemperatureKey(_ key: String) -> Bool {
@@ -34,6 +35,9 @@ public struct ProbeResult: Codable {
         public var cores: Int
         public var perfCores: Int?
         public var effCores: Int?
+        /// 本机首选 IP (优先 Tailscale 100.x, 否则局域网 IP)。用于 server 识别设备来源,
+        /// 因为 NAS 上 Tailscale 用户空间转发会把连接源 IP 改写成 127.0.0.1
+        public var localIP: String?
     }
 
     public struct CPUResult: Codable {
@@ -239,7 +243,8 @@ public func collectOnce(sampleIntervalSeconds: Double = 1.0) -> ProbeResult {
             uptimeSeconds: ProcessInfo.processInfo.systemUptime,
             cores: Int(sysctlInt("hw.ncpu") ?? 0),
             perfCores: perfCount,
-            effCores: effCount
+            effCores: effCount,
+            localIP: primaryLocalIP()
         ),
         cpu: ProbeResult.CPUResult(
             usage: usage,
@@ -321,4 +326,29 @@ private func aggregate(_ cores: [CPUTicks]) -> CPUTicks {
         total.nice += c.nice
     }
     return total
+}
+
+/// 获取本机首选 IP: 优先 Tailscale 地址 (100.64.0.0/10), 否则第一个非回环 IPv4
+func primaryLocalIP() -> String? {
+    var addrs: UnsafeMutablePointer<ifaddrs>?
+    guard getifaddrs(&addrs) == 0, let first = addrs else { return nil }
+    defer { freeifaddrs(addrs) }
+
+    var fallback: String?
+    for p in sequence(first: first, next: { $0.pointee.ifa_next }) {
+        let ifa = p.pointee
+        guard ifa.ifa_addr != nil, ifa.ifa_addr.pointee.sa_family == UInt8(AF_INET) else { continue }
+        if String(cString: ifa.ifa_name) == "lo0" { continue }
+        var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+        if getnameinfo(ifa.ifa_addr, socklen_t(ifa.ifa_addr.pointee.sa_len),
+                       &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) != 0 { continue }
+        let ip = String(cString: host)
+        // Tailscale 用户空间使用的 CGNAT 段 100.64.0.0/10
+        let parts = ip.split(separator: ".").compactMap { Int($0) }
+        if parts.count == 4, parts[0] == 100, (64...127).contains(parts[1]) {
+            return ip
+        }
+        if fallback == nil { fallback = ip }
+    }
+    return fallback
 }

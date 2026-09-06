@@ -873,6 +873,8 @@ func main() {
 			http.Error(w, "bad json", http.StatusBadRequest)
 			return
 		}
+		// 设备上报的本机 IP 优先于连接来源: NAS 上 Tailscale 用户空间转发会让连接源变成 127.0.0.1
+		reportedIP := reportedLocalIP(payload.Data)
 
 		if !ok {
 			if provision != "" {
@@ -880,7 +882,7 @@ func main() {
 				if code, cok := store.matchPendingCode(token, payload.DeviceID); cok {
 					device, _ = store.activatePendingCode(code)
 				} else {
-					store.recordUnregistered(payload.DeviceID, clientIP(r))
+					store.recordUnregistered(payload.DeviceID, preferIP(reportedIP, clientIP(r)))
 					http.Error(w, "invalid token", http.StatusUnauthorized)
 					return
 				}
@@ -908,7 +910,7 @@ func main() {
 			http.Error(w, "ingest failed", http.StatusInternalServerError)
 			return
 		}
-		store.touchDevice(device, clientIP(r))
+		store.touchDevice(device, preferIP(reportedIP, clientIP(r)))
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	})
@@ -1143,4 +1145,26 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return host
+}
+
+// 优先使用设备上报的本机 IP; 连接来源为回环(127.x)时忽略, 退回连接来源
+func preferIP(reported, conn string) string {
+	reported = strings.TrimSpace(reported)
+	if reported == "" || reported == "127.0.0.1" || reported == "::1" || strings.HasPrefix(reported, "127.") {
+		return conn
+	}
+	return reported
+}
+
+// 从推送 data 中解析 device.localIP (设备上报的本机 IP)
+func reportedLocalIP(data json.RawMessage) string {
+	var d struct {
+		Device *struct {
+			LocalIP string `json:"localIP"`
+		} `json:"device"`
+	}
+	if json.Unmarshal(data, &d) == nil && d.Device != nil {
+		return d.Device.LocalIP
+	}
+	return ""
 }

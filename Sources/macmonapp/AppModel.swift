@@ -17,7 +17,8 @@ final class AppModel: ObservableObject {
     @Published var error: String?
     @Published var isLaunchAtLogin = false
     @Published var updateAvailable: UpdateInfo?
-    @Published var checkUpdateError: String?
+    @Published var updateStatus: String?     // 检查更新结果提示 (设置页显示)
+    @Published var isCheckingUpdate = false
 
     // 被监控机器 (菜单栏实时显示)
     @Published var monitorDeviceList: [MonitorDevice] = []
@@ -76,7 +77,10 @@ final class AppModel: ObservableObject {
             startMonitorTimer()
             Task { await refreshMonitor() }
         }
-        checkForUpdates()
+        // 自动检查更新默认关闭, 由用户在设置中开启 (更新时机由用户决定)
+        if config.autoUpdateCheck == true {
+            checkForUpdates()
+        }
     }
 
     // MARK: - 被监控机器 (菜单栏实时显示)
@@ -212,13 +216,29 @@ final class AppModel: ObservableObject {
     // MARK: - 自动更新
 
     func checkForUpdates() {
+        guard !isCheckingUpdate else { return }
+        isCheckingUpdate = true
+        updateStatus = nil
         Task {
             do {
-                self.updateAvailable = try await AppUpdater.checkLatest()
+                if let info = try await AppUpdater.checkLatest() {
+                    self.updateAvailable = info
+                    self.updateStatus = "发现新版本 \(info.version), 可前往下载"
+                } else {
+                    self.updateAvailable = nil
+                    self.updateStatus = "已是最新版本 (v\(AppUpdater.currentVersion))"
+                }
             } catch {
-                self.checkUpdateError = "检查更新失败: \(error.localizedDescription)"
+                self.updateStatus = "检查更新失败: \(error.localizedDescription)"
             }
+            self.isCheckingUpdate = false
         }
+    }
+
+    /// 设置启动时是否自动检查更新
+    func setAutoUpdateCheck(_ on: Bool) {
+        config.autoUpdateCheck = on
+        try? config.save()
     }
 
     /// 打开最新版本的 DMG 下载

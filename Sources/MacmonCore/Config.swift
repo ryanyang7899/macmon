@@ -13,6 +13,7 @@ public struct AgentConfig: Codable {
     public var token: String?            // 设备鉴权 token
     public var monitorDevices: [String]? // 勾选的被监控设备 (菜单栏实时显示), nil=未设置
     public var monitorItems: [String]?   // 菜单栏弹窗显示的条目 (cpu/memory/temp/network/battery/gpu), nil=未设置
+    public var autoUpdateCheck: Bool?    // 启动时自动检查更新, nil/false=仅手动检查
 
     public static func load() -> AgentConfig {
         let file = configFileURL()

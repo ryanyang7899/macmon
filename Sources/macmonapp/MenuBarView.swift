@@ -152,10 +152,13 @@ struct MenuBarView: View {
     }
 
     /// 按勾选条目渲染: 条目名 + 当前值 + 图表
+    /// 无电池的台式机 (采样中 battery == nil) 自动跳过电池条目, 节省空间
     @ViewBuilder
     private func itemCharts(history: [MonitorPoint]) -> some View {
         ForEach(enabledItems, id: \.self) { item in
-            itemRow(item, history: history)
+            if item != "battery" || history.last?.battery != nil {
+                itemRow(item, history: history)
+            }
         }
     }
 

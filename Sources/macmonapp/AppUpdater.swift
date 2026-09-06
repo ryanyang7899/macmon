@@ -27,7 +27,7 @@ enum AppUpdater {
         var req = URLRequest(url: url)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         req.setValue("macmon-updater/1.0", forHTTPHeaderField: "User-Agent")
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await fetchWithFallback(req)
         guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
             throw URLError(.badServerResponse)
         }
@@ -54,6 +54,23 @@ enum AppUpdater {
 
         return UpdateInfo(version: latest.tag_name, downloadURL: dl,
                           isPrerelease: latest.prerelease, notes: latest.body)
+    }
+
+    /// 请求 GitHub API: 先直连, 失败 (网络不通/被墙) 时经本地代理 127.0.0.1:7890 重试
+    private static func fetchWithFallback(_ req: URLRequest) async throws -> (Data, URLResponse) {
+        do {
+            return try await URLSession.shared.data(for: req)
+        } catch {
+            let cfg = URLSessionConfiguration.ephemeral
+            cfg.timeoutIntervalForRequest = 10
+            cfg.connectionProxyDictionary = [
+                "HTTPEnable": 1, "HTTPProxy": "127.0.0.1", "HTTPPort": 7890,
+                "HTTPSEnable": 1, "HTTPSProxy": "127.0.0.1", "HTTPSPort": 7890,
+            ]
+            let proxied = URLSession(configuration: cfg)
+            defer { proxied.finishTasksAndInvalidate() }
+            return try await proxied.data(for: req)
+        }
     }
 
     /// 简单版本号比较: a > b 返回 1, 相等 0, a < b 返回 -1

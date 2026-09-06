@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var setupKey = ""
     @State private var interval = 5.0
     @State private var launchAtLogin = false
+    @State private var autoUpdateCheck = false
     @State private var monitorSelection: Set<String> = []
     @State private var itemSelection: Set<String> = []
     @State private var itemOrder: [String] = []
@@ -66,6 +67,7 @@ struct SettingsView: View {
             deviceName = model.config.deviceID
             interval = model.config.interval
             launchAtLogin = model.isLaunchAtLogin
+            autoUpdateCheck = model.config.autoUpdateCheck ?? false
             monitorSelection = Set(model.config.monitorDevices ?? [])
             itemOrder = model.config.monitorItems ?? AgentConfig.allItems
             itemSelection = Set(itemOrder)
@@ -197,6 +199,33 @@ struct SettingsView: View {
                 .onChange(of: launchAtLogin) { on in
                     model.toggleLaunchAtLogin(on)
                 }
+            Toggle("启动时自动检查更新", isOn: $autoUpdateCheck)
+                .onChange(of: autoUpdateCheck) { on in
+                    model.setAutoUpdateCheck(on)
+                }
+
+            HStack {
+                Text("当前版本").font(.callout).foregroundColor(.secondary)
+                Spacer()
+                Text("v\(AppUpdater.currentVersion)").fontWeight(.medium)
+            }
+
+            HStack {
+                if model.isCheckingUpdate {
+                    ProgressView().controlSize(.small)
+                    Text("正在检查更新…").font(.caption).foregroundColor(.secondary)
+                } else if let status = model.updateStatus {
+                    Text(status).font(.caption).foregroundColor(.secondary)
+                }
+                Spacer()
+                if let upd = model.updateAvailable {
+                    Button("下载 \(upd.version)") { model.downloadUpdate() }
+                        .controlSize(.small)
+                } else {
+                    Button("检查更新") { model.checkForUpdates() }
+                        .controlSize(.small)
+                }
+            }
         }
     }
 

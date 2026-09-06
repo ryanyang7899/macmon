@@ -204,26 +204,30 @@ struct SettingsView: View {
                     model.setAutoUpdateCheck(on)
                 }
 
+            // 版本号 + 检查更新按钮同行
             HStack {
                 Text("当前版本").font(.callout).foregroundColor(.secondary)
                 Spacer()
-                Text("v\(AppUpdater.currentVersion)").fontWeight(.medium)
-            }
-
-            HStack {
                 if model.isCheckingUpdate {
                     ProgressView().controlSize(.small)
-                    Text("正在检查更新…").font(.caption).foregroundColor(.secondary)
-                } else if let status = model.updateStatus {
-                    Text(status).font(.caption).foregroundColor(.secondary)
-                }
-                Spacer()
-                if let upd = model.updateAvailable {
-                    Button("下载 \(upd.version)") { model.downloadUpdate() }
-                        .controlSize(.small)
                 } else {
+                    Text("v\(AppUpdater.currentVersion)").fontWeight(.medium)
                     Button("检查更新") { model.checkForUpdates() }
                         .controlSize(.small)
+                }
+            }
+
+            // 检查结果 / 下载入口
+            if model.isCheckingUpdate {
+                Text("正在检查更新…").font(.caption).foregroundColor(.secondary)
+            } else if let status = model.updateStatus {
+                HStack {
+                    Text(status).font(.caption).foregroundColor(.secondary)
+                    Spacer()
+                    if let upd = model.updateAvailable {
+                        Button("下载 \(upd.version)") { model.downloadUpdate() }
+                            .controlSize(.small)
+                    }
                 }
             }
         }

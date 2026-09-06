@@ -50,7 +50,6 @@ struct MonitorWindowView: View {
             }
         }
         .frame(width: 320)
-        .ignoresSafeArea(edges: .top)   // 吃掉系统标题栏预留区, 内容直达窗口顶部
         // 玻璃背景铺满整窗
         .background(FrostedGlassBackground().ignoresSafeArea())
         .background(WindowAccessor(window: $window, configure: configureWindow))
@@ -58,16 +57,11 @@ struct MonitorWindowView: View {
         .onAppear { applyLevel() }
     }
 
-    /// 窗口透明化 + 全幅内容 + 隐藏系统按钮 (自带关闭按钮), 背景可拖动
+    /// 无边框窗口: 彻底移除系统标题栏 (红绿灯区域不复存在), 玻璃背景铺满, 背景可拖动
     private func configureWindow(_ w: NSWindow) {
+        w.styleMask = [.borderless, .resizable]
         w.isOpaque = false
         w.backgroundColor = .clear
-        w.titlebarAppearsTransparent = true
-        w.titleVisibility = .hidden
-        w.styleMask.insert(.fullSizeContentView)
-        w.standardWindowButton(.closeButton)?.isHidden = true
-        w.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        w.standardWindowButton(.zoomButton)?.isHidden = true
         w.isMovableByWindowBackground = true
     }
 

@@ -171,11 +171,15 @@ func (s *Store) provisionDevices(spec string) []string {
 		if name == "" || token == "" {
 			continue
 		}
-		if _, ok := s.devices[name]; !ok {
-			s.devices[name] = Device{Name: name, Token: token}
+		// 预配只作为"种子": 仅当该 token 尚未映射到其他设备时才生效。
+		// 设备已改名时, 重启不得把 token 映射重置回预配名 (否则僵尸条目反复复活)
+		if _, exists := s.tokenToDevice[token]; !exists {
+			if _, ok := s.devices[name]; !ok {
+				s.devices[name] = Device{Name: name, Token: token}
+			}
+			s.tokenToDevice[token] = name
+			names = append(names, name)
 		}
-		s.tokenToDevice[token] = name
-		names = append(names, name)
 	}
 	return names
 }
@@ -904,13 +908,8 @@ func main() {
 			http.Error(w, "device suspended", http.StatusForbidden)
 			return
 		}
-		// App 设置里修改设备名后, 上报名与注册名不同: 同步改名 (与已注册名冲突则保持旧名)
-		if payload.DeviceID != "" && payload.DeviceID != device.Name {
-			if err := store.renameDevice(device.Name, payload.DeviceID); err == nil {
-				device, _ = store.deviceByName(payload.DeviceID)
-			}
-		}
-		// 以 token 对应的设备名为准, 避免 Agent 端 deviceID 不一致
+		// 以 token 对应的注册名为准。不随上报的 device_id 自动改名:
+		// App 端 device_id 可能是首次运行生成的 UUID, 自动改名会制造并存的僵尸条目
 		payload.DeviceID = device.Name
 		if err := store.ingest(payload, device); err != nil {
 			http.Error(w, "ingest failed", http.StatusInternalServerError)

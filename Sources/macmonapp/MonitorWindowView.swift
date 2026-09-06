@@ -57,20 +57,12 @@ struct MonitorWindowView: View {
         .onAppear { applyLevel() }
     }
 
-    /// 标准 titled 窗口: 保留系统圆角与正确的焦点描边 (无边框窗口获焦时会出现方角强调层)
-    /// 标题栏透明化 + 隐藏红绿灯 + 背景可拖动; 标题栏自身透明不占视觉空间
+    /// 无边框窗口: 无系统标题栏 (用户明确偏好, 可接受获焦时的矩形描边)
+    /// 玻璃背景铺满, 背景可拖动
     private func configureWindow(_ w: NSWindow) {
+        w.styleMask = [.borderless, .resizable]
         w.isOpaque = false
         w.backgroundColor = .clear
-        w.titlebarAppearsTransparent = true
-        w.titleVisibility = .hidden
-        w.styleMask.insert(.fullSizeContentView)
-        if #available(macOS 26.0, *) {
-            w.titlebarSeparatorStyle = .none
-        }
-        w.standardWindowButton(.closeButton)?.isHidden = true
-        w.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        w.standardWindowButton(.zoomButton)?.isHidden = true
         w.isMovableByWindowBackground = true
     }
 

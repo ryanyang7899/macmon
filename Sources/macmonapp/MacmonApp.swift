@@ -45,6 +45,12 @@ struct MacmonApp: App {
 
         // 设置窗口: 启动时由 AppDelegate 立即收起, 由菜单栏"设置…"按钮按需打开
         settingsWindow
+
+        // 窗口模式: 监控内容显示为标准窗口, 可固定置顶 (仅由"窗口模式"按钮打开, 不随启动创建)
+        Window("实时监控", id: "monitor") {
+            MonitorWindowView(model: model)
+        }
+        .windowResizability(.contentMinSize)
     }
 
     private var settingsWindow: some Scene {

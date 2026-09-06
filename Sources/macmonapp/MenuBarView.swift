@@ -13,21 +13,16 @@ struct MenuBarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if monitoredDevices.isEmpty {
-                // 未勾选被监控设备: 回退显示本机状态 (同样图表化)
-                if let l = model.latest {
-                    localSection(l)
-                } else {
-                    Text("尚未采集").foregroundColor(.secondary)
-                }
-            } else {
-                // 已勾选被监控设备: 展示它们的实时状态
-                ForEach(monitoredDevices, id: \.self) { name in
-                    monitorSection(for: name)
-                }
-            }
+            MonitorContentView(model: model)
 
             Divider()
+
+            Button {
+                openWindow(id: "monitor")
+            } label: {
+                Label("窗口模式 (可固定置顶)", systemImage: "macwindow.on.rectangle")
+                    .frame(maxWidth: .infinity)
+            }
 
             HStack {
                 Button("设置…") { openWindow(id: "main") }
@@ -43,6 +38,29 @@ struct MenuBarView: View {
         }
         .padding(10)
         .frame(width: 300)
+    }
+}
+
+/// 监控内容视图: 菜单栏弹窗与"窗口模式"共用
+struct MonitorContentView: View {
+    @ObservedObject var model: AppModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if monitoredDevices.isEmpty {
+                // 未勾选被监控设备: 回退显示本机状态 (同样图表化)
+                if let l = model.latest {
+                    localSection(l)
+                } else {
+                    Text("尚未采集").foregroundColor(.secondary)
+                }
+            } else {
+                // 已勾选被监控设备: 展示它们的实时状态
+                ForEach(monitoredDevices, id: \.self) { name in
+                    monitorSection(for: name)
+                }
+            }
+        }
     }
 
     /// 当前勾选的被监控设备名列表

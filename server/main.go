@@ -904,6 +904,12 @@ func main() {
 			http.Error(w, "device suspended", http.StatusForbidden)
 			return
 		}
+		// App 设置里修改设备名后, 上报名与注册名不同: 同步改名 (与已注册名冲突则保持旧名)
+		if payload.DeviceID != "" && payload.DeviceID != device.Name {
+			if err := store.renameDevice(device.Name, payload.DeviceID); err == nil {
+				device, _ = store.deviceByName(payload.DeviceID)
+			}
+		}
 		// 以 token 对应的设备名为准, 避免 Agent 端 deviceID 不一致
 		payload.DeviceID = device.Name
 		if err := store.ingest(payload, device); err != nil {

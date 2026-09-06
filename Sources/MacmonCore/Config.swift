@@ -12,12 +12,14 @@ public struct AgentConfig: Codable {
     public var serverURL: String?        // 推送服务器地址
     public var token: String?            // 设备鉴权 token
     public var monitorDevices: [String]? // 勾选的被监控设备 (菜单栏实时显示), nil=未设置
+    public var monitorItems: [String]?   // 菜单栏弹窗显示的条目 (cpu/memory/temp/network/battery/gpu), nil=未设置
 
     public static func load() -> AgentConfig {
         let file = configFileURL()
         if let data = try? Data(contentsOf: file),
            var cfg = try? JSONDecoder().decode(AgentConfig.self, from: data) {
             if cfg.monitorDevices == nil { cfg.monitorDevices = [] }   // 兼容旧配置
+            if cfg.monitorItems == nil { cfg.monitorItems = Self.allItems } // 兼容旧配置: 默认全开
             return cfg
         }
         // 首次运行: 生成配置
@@ -25,7 +27,8 @@ public struct AgentConfig: Codable {
                               interval: 5.0,
                               serverURL: nil,
                               token: nil,
-                              monitorDevices: [])
+                              monitorDevices: [],
+                              monitorItems: Self.allItems)
         try? cfg.save()
         return cfg
     }
@@ -37,6 +40,9 @@ public struct AgentConfig: Codable {
         let data = try JSONEncoder().encode(self)
         try data.write(to: file)
     }
+
+    /// 菜单栏条目的全集与默认值 (全开)
+    public static let allItems = ["cpu", "memory", "temp", "network", "battery", "gpu"]
 
     public static func configFileURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory,

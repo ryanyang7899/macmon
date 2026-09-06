@@ -23,6 +23,10 @@ final class AppModel: ObservableObject {
     @Published var monitorDeviceList: [MonitorDevice] = []
     @Published var monitorSnapshots: [String: MonitorEntry] = [:]
     @Published var monitorError: String?
+    // 图表数据: 设备名 -> 时间序列 (环形缓冲, 最近 ~10 分钟)
+    @Published var monitorHistory: [String: [MonitorPoint]] = [:]
+    // 本机回退视图的图表数据
+    @Published var localHistory: [MonitorPoint] = []
 
     private var timer: Timer?
     private var monitorTimer: Timer?
@@ -108,7 +112,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// 拉取勾选设备的实时快照 (5s 轮询)
+    /// 拉取勾选设备的实时快照 (5s 轮询), 并追加到图表缓冲
     func refreshMonitor() async {
         let devices = config.monitorDevices ?? []
         guard !devices.isEmpty, let base = config.serverURL, let url = URL(string: base),
@@ -125,10 +129,49 @@ final class AppModel: ObservableObject {
             let (data, resp) = try await Self.monitorSession.data(for: req)
             guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else { return }
             self.monitorSnapshots = try JSONDecoder().decode([String: MonitorEntry].self, from: data)
+            // 追加图表缓冲
+            for (name, entry) in monitorSnapshots {
+                if let d = entry.latest?.data {
+                    var buf = monitorHistory[name] ?? []
+                    append(&buf, makePoint(from: d, ts: entry.latest!.ts))
+                    monitorHistory[name] = buf
+                }
+            }
+            // 清理已不再勾选设备的缓冲
+            let sel = Set(devices)
+            for key in monitorHistory.keys where !sel.contains(key) {
+                monitorHistory.removeValue(forKey: key)
+            }
         } catch {
             // 轮询失败静默, 等待下个周期; 不刷掉旧数据
         }
     }
+
+    /// 从采样提取图表点
+    private func makePoint(from d: ProbeResult, ts: Int64) -> MonitorPoint {
+        MonitorPoint(ts: ts,
+                     cpuUsage: d.cpu.usage,
+                     cpuTemp: d.cpu.temp,
+                     memUsed: d.memory.usedGB,
+                     memTotal: d.memory.totalGB,
+                     rxBps: d.network.rxBps,
+                     txBps: d.network.txBps,
+                     gpuUsage: d.gpu.first?.utilization,
+                     gpuTemp: d.gpu.first?.temperature,
+                     battery: d.battery.present ? d.battery.chargePercent : nil,
+                     charging: d.battery.isCharging)
+    }
+
+    /// 追加图表点 (环形上限 historyCapacity)
+    private func append(_ buffer: inout [MonitorPoint], _ p: MonitorPoint) {
+        buffer.append(p)
+        if buffer.count > Self.historyCapacity {
+            buffer.removeFirst(buffer.count - Self.historyCapacity)
+        }
+    }
+
+    /// 图表缓冲上限: 120 点 (5s 轮询 ≈ 10 分钟)
+    static let historyCapacity = 120
 
     /// 设置/取消勾选的被监控设备, 持久化并管理轮询
     func setMonitorSelection(_ devices: [String]) {
@@ -142,6 +185,13 @@ final class AppModel: ObservableObject {
             startMonitorTimer()
             Task { await refreshMonitor() }
         }
+    }
+
+    /// 设置菜单栏显示条目, 持久化
+    func setMonitorItems(_ items: [String]) {
+        config.monitorItems = items
+        try? config.save()
+        log("setMonitorItems: \(items.joined(separator: ","))")
     }
 
     private func startMonitorTimer() {
@@ -262,7 +312,9 @@ final class AppModel: ObservableObject {
             tx?.send(result)
             DispatchQueue.main.async {
                 self.latest = result
-                self.statusText = "采集中 · CPU \(Int(result.cpu.usage * 100))%"
+                self.statusText = "采集中"
+                // 本机图表缓冲
+                self.append(&self.localHistory, self.makePoint(from: result, ts: Int64(Date().timeIntervalSince1970)))
             }
         }
     }
@@ -310,4 +362,19 @@ struct MonitorEntry: Decodable {
     let latest: MonitorSnapshot?
     let last_seen: Int64
     let suspended: Bool
+}
+
+/// 菜单栏图表的单个采样点 (从 ProbeResult 提取的字段子集)
+struct MonitorPoint {
+    let ts: Int64
+    let cpuUsage: Double
+    let cpuTemp: Double?
+    let memUsed: Double
+    let memTotal: Double
+    let rxBps: Double
+    let txBps: Double
+    let gpuUsage: Double?
+    let gpuTemp: Double?
+    let battery: Double?
+    let charging: Bool
 }

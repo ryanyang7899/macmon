@@ -47,6 +47,6 @@ struct MainView: View {
 
             SettingsView(model: model)
         }
-        .frame(minWidth: 480, minHeight: 460)
+        .frame(minWidth: 480, idealWidth: 500, minHeight: 500, idealHeight: 640)
     }
 }

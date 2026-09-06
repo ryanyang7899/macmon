@@ -64,7 +64,26 @@ PLIST
 echo "==> ad-hoc 签名"
 codesign --force --deep --sign - "$APP_DIR"
 
+echo "==> 制作 DMG (含 Applications 快捷方式 + 挂载盘图标)"
+DMG_DIR="dist/dmg-staging"
+DMG_PATH="dist/$APP_NAME-$VERSION.dmg"
+rm -rf "$DMG_DIR"
+mkdir -p "$DMG_DIR"
+cp -R "$APP_DIR" "$DMG_DIR/"
+ln -sf /Applications "$DMG_DIR/Applications"
+# 挂载盘图标: .VolumeIcon.icns; custom icon 标志位需在挂载的卷根上设置
+cp Resources/AppIcon.icns "$DMG_DIR/.VolumeIcon.icns"
+rm -f "$DMG_PATH" dist/dmg-tmp.dmg
+hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_DIR" -ov -format UDRW dist/dmg-tmp.dmg > /dev/null
+MNT=$(mktemp -d)
+hdiutil attach dist/dmg-tmp.dmg -mountpoint "$MNT" -nobrowse -quiet
+SetFile -a C "$MNT"
+hdiutil detach "$MNT" -quiet
+hdiutil convert dist/dmg-tmp.dmg -format UDZO -o "$DMG_PATH" > /dev/null
+rm -rf "$DMG_DIR" dist/dmg-tmp.dmg "$MNT"
+
 echo ""
 echo "✅ 打包完成: $APP_DIR"
+echo "   DMG:        $DMG_PATH"
 echo "   本机运行:   open $APP_DIR"
-echo "   分发给他人: 压缩 zip 后发送; 对方首次需右键->打开 (或先执行 xattr -dr com.apple.quarantine)"
+echo "   分发给他人: 上传 DMG; 对方首次需右键->打开 (或先执行 xattr -dr com.apple.quarantine)"

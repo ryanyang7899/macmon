@@ -49,7 +49,14 @@ struct MonitorWindowView: View {
                     .padding(.bottom, 12)
             }
         }
-        .frame(width: 320)
+        // 自适应宽度: 跟随窗口横向大小, 最小 300
+        .frame(minWidth: 300, idealWidth: 340, maxWidth: .infinity)
+        // 右下角拖拽把手: 无边框窗口没有边缘热区, 用把手拖拽调整窗口大小
+        .overlay(alignment: .bottomTrailing) {
+            ResizeGrip(minWidth: 300, minHeight: 220)
+                .frame(width: 18, height: 18)
+                .padding(3)
+        }
         // 玻璃背景铺满整窗 (含标题栏区域, 标题栏已透明化)
         .background(FrostedGlassBackground().ignoresSafeArea())
         .background(WindowAccessor(window: $window, configure: configureWindow))
@@ -113,4 +120,62 @@ struct WindowAccessor: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+/// 拖拽调整窗口大小的把手 (无边框窗口没有边缘热区, 需自行实现)
+/// 放在右下角, 按住拖动即可横/纵向调整; 拖动期间锚定窗口左上角
+struct ResizeGrip: NSViewRepresentable {
+    var minWidth: CGFloat
+    var minHeight: CGFloat
+
+    func makeNSView(context: Context) -> NSView {
+        GripView(minWidth: minWidth, minHeight: minHeight)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class GripView: NSView {
+        let minWidth: CGFloat
+        let minHeight: CGFloat
+        private var startFrame: NSRect?
+        private var startLoc: NSPoint?
+
+        init(minWidth: CGFloat, minHeight: CGFloat) {
+            self.minWidth = minWidth
+            self.minHeight = minHeight
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) 不支持") }
+
+        // 拖把手时不要触发窗口整体拖动 (isMovableByWindowBackground)
+        override var mouseDownCanMoveWindow: Bool { false }
+
+        override func mouseDown(with event: NSEvent) {
+            startFrame = window?.frame
+            startLoc = NSEvent.mouseLocation
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let w = window, let sf = startFrame, let sl = startLoc else { return }
+            let cur = NSEvent.mouseLocation
+            var f = sf
+            // 宽度: 光标水平位移直接加到宽度上
+            f.size.width = max(minWidth, sf.width + (cur.x - sl.x))
+            // 高度: 光标下移 = 缩小, 同时保持窗口顶边不动
+            let newHeight = max(minHeight, sf.height - (cur.y - sl.y))
+            f.origin.y = sf.origin.y + sf.height - newHeight
+            f.size.height = newHeight
+            w.setFrame(f, display: true, animate: false)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            startFrame = nil
+            startLoc = nil
+        }
+
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .crosshair)
+        }
+    }
 }

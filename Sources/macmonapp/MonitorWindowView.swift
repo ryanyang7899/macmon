@@ -1,6 +1,7 @@
 //
 //  MonitorWindowView.swift
 //  窗口模式: 把菜单栏弹窗的监控内容显示为标准桌面窗口
+//  外观: 与菜单栏弹窗一致的磨砂玻璃效果 (macOS 26 用 NSGlassEffectView 液态玻璃, 低版本回退 NSVisualEffectView)
 //  可通过 📌 固定按钮置顶 (浮动层级 + 跨所有空间), 随时监控无需点开菜单栏
 //
 
@@ -16,7 +17,7 @@ struct MonitorWindowView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标题栏行: 标题 + 固定/关闭按钮
+            // 标题栏行: 标题 + 固定/关闭按钮 (系统标题栏已透明化, 此行即标题栏)
             HStack(spacing: 10) {
                 Text("实时监控")
                     .font(.headline)
@@ -39,17 +40,30 @@ struct MonitorWindowView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
-            Divider()
-
             ScrollView {
                 MonitorContentView(model: model)
                     .padding(12)
             }
         }
         .frame(width: 320)
-        .background(WindowAccessor(window: $window))
+        // 玻璃背景铺满整窗 (含标题栏区域)
+        .background(FrostedGlassBackground().ignoresSafeArea())
+        .background(WindowAccessor(window: $window, configure: configureWindow))
         .onChange(of: pinned) { _ in applyLevel() }
         .onAppear { applyLevel() }
+    }
+
+    /// 窗口透明化 + 全幅内容 + 隐藏系统按钮 (自带关闭按钮), 背景可拖动
+    private func configureWindow(_ w: NSWindow) {
+        w.isOpaque = false
+        w.backgroundColor = .clear
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.styleMask.insert(.fullSizeContentView)
+        w.standardWindowButton(.closeButton)?.isHidden = true
+        w.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        w.standardWindowButton(.zoomButton)?.isHidden = true
+        w.isMovableByWindowBackground = true
     }
 
     /// 应用固定层级: 置顶 = 浮动窗口 + 跨所有空间
@@ -65,17 +79,38 @@ struct MonitorWindowView: View {
     }
 }
 
-/// 拿到宿主 NSWindow 引用
+/// 磨砂玻璃背景: macOS 26 液态玻璃, 低版本回退自适应磨砂
+struct FrostedGlassBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        if #available(macOS 26.0, *) {
+            return NSGlassEffectView()
+        } else {
+            let v = NSVisualEffectView()
+            v.material = .menu               // 自适应明暗, 与菜单栏弹窗观感一致
+            v.blendingMode = .behindWindow
+            v.state = .active
+            return v
+        }
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+/// 拿到宿主 NSWindow 引用并做一次性配置
 struct WindowAccessor: NSViewRepresentable {
     @Binding var window: NSWindow?
+    var configure: ((NSWindow) -> Void)? = nil
 
     func makeNSView(context: Context) -> NSView {
         let v = NSView()
-        DispatchQueue.main.async { self.window = v.window }
+        DispatchQueue.main.async {
+            if let w = v.window {
+                configure?(w)
+                window = w
+            }
+        }
         return v
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { self.window = nsView.window }
-    }
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }

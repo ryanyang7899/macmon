@@ -160,9 +160,9 @@ public func collectOnce(sampleIntervalSeconds: Double = 1.0) -> ProbeResult {
     if let before = cpuTicksBefore, let after = cpuTicksAfter, before.count == after.count {
         usage = cpuUsage(from: aggregate(before), to: aggregate(after))
         for (b, a) in zip(before, after) {
-            let dt = a.total - b.total
+            let dt = a.total.satSub(b.total)   // 防计数回退时 UInt64 下溢
             if dt > 0 {
-                let busy = (a.user + a.system + a.nice) - (b.user + b.system + b.nice)
+                let busy = (a.user + a.system + a.nice).satSub(b.user + b.system + b.nice)
                 usagePerCore.append(Double(busy) / Double(dt))
             } else {
                 usagePerCore.append(0)
@@ -170,11 +170,11 @@ public func collectOnce(sampleIntervalSeconds: Double = 1.0) -> ProbeResult {
         }
         let aggBefore = aggregate(before)
         let aggAfter = aggregate(after)
-        let dt = aggAfter.total - aggBefore.total
+        let dt = aggAfter.total.satSub(aggBefore.total)
         if dt > 0 {
-            systemLoad = Double(aggAfter.system - aggBefore.system) / Double(dt)
-            userLoad = Double(aggAfter.user - aggBefore.user) / Double(dt)
-            idleLoad = Double(aggAfter.idle - aggBefore.idle) / Double(dt)
+            systemLoad = Double(aggAfter.system.satSub(aggBefore.system)) / Double(dt)
+            userLoad = Double(aggAfter.user.satSub(aggBefore.user)) / Double(dt)
+            idleLoad = Double(aggAfter.idle.satSub(aggBefore.idle)) / Double(dt)
         }
     }
 
@@ -280,14 +280,16 @@ public func collectOnce(sampleIntervalSeconds: Double = 1.0) -> ProbeResult {
         ),
         disk: ProbeResult.DiskResult(
             volumes: volumes,
-            readBps: Double(diskIOAfter.readBytes - diskIOBefore.readBytes) / interval,
-            writeBps: Double(diskIOAfter.writeBytes - diskIOBefore.writeBytes) / interval
+            readBps: Double(diskIOAfter.readBytes.satSub(diskIOBefore.readBytes)) / interval,
+            writeBps: Double(diskIOAfter.writeBytes.satSub(diskIOBefore.writeBytes)) / interval
         ),
         network: ProbeResult.NetworkResult(
             interface: netAfter.interface,
             status: netAfter.status,
-            rxBps: Double(netAfter.rxBytes - netBefore.rxBytes) / interval,
-            txBps: Double(netAfter.txBytes - netBefore.txBytes) / interval,
+            // 换网时主接口切换或计数器重置会导致 after < before, UInt64 直接相减会下溢崩溃;
+            // 用饱和减法退化为 0 速率, 下个周期自然恢复
+            rxBps: Double(netAfter.rxBytes.satSub(netBefore.rxBytes)) / interval,
+            txBps: Double(netAfter.txBytes.satSub(netBefore.txBytes)) / interval,
             rxTotalBytes: netAfter.rxBytes,
             txTotalBytes: netAfter.txBytes,
             localIP: netAfter.localIP,

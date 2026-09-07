@@ -86,10 +86,12 @@ func sampleCPUTicks() -> CPUTicks? {
 }
 
 /// 两次采样差值计算占用率 (0~1)
+/// tick 计数理论上单调递增, 但为防异常回退 (休眠/计数器重置) 导致 UInt64 下溢崩溃, 全部用饱和减法
 func cpuUsage(from before: CPUTicks, to after: CPUTicks) -> Double {
-    let dt = after.total - before.total
+    let dt = after.total.satSub(before.total)
     guard dt > 0 else { return 0 }
-    let busy = (after.user + after.system + after.nice) - (before.user + before.system + before.nice)
+    let busy = (after.user + after.system + after.nice)
+        .satSub(before.user + before.system + before.nice)
     return Double(busy) / Double(dt)
 }
 
@@ -227,4 +229,10 @@ func loadAverages() -> [Double] {
     var loads = [Double](repeating: 0, count: 3)
     getloadavg(&loads, 3)
     return loads
+}
+
+/// 饱和减法: UInt64 差值为负时归 0 (计数回退保护, 本工具链无 saturatingSub)
+func satSub(_ a: UInt64, _ b: UInt64) -> UInt64 { a > b ? a - b : 0 }
+extension UInt64 {
+    func satSub(_ other: UInt64) -> UInt64 { self > other ? self - other : 0 }
 }

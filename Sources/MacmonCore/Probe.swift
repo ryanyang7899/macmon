@@ -136,6 +136,11 @@ public func runProbe(sampleIntervalSeconds: Double = 1.0) -> ProbeResult {
 }
 
 /// 核心采集函数: 两次采样计算差值指标, 返回完整快照 (Agent 循环复用)
+
+/// GPU 断电温度保持缓存: ioClass -> (最后有效温度, 采集时间)
+/// collectOnce 只在串行采集队列调用, 无需加锁
+nonisolated(unsafe) var lastKnownGPUTemp: [String: (Double, Date)] = [:]
+
 public func collectOnce(sampleIntervalSeconds: Double = 1.0) -> ProbeResult {
     // ---- 采样 1 ----
     let cpuTicksBefore = samplePerCoreTicks()
@@ -214,15 +219,35 @@ public func collectOnce(sampleIntervalSeconds: Double = 1.0) -> ProbeResult {
     let cpuTemp = avg("Tp") ?? avg("TC")
     let gpuTemp = avg("Tg")
 
+    // GPU 断电保持: GPU 空闲被电源门控时, PerformanceStatistics 与 SMC Tg* 传感器
+    // 都读不出有效温度 (实测 Tg* 全为负值), 温度字段会短暂变 0。
+    // 沿用最后已知有效温度, 超过 60s 未更新则视为过期置 nil, 避免永久假数据。
+    for g in collectGPUStats() {
+        let key = "gpu:\(g.ioClass)"
+        if let t = g.temperature, t > 0 {
+            lastKnownGPUTemp[key] = (t, Date())
+        }
+    }
+
     // GPU (利用率读 PerformanceStatistics, 温度融合 SMC)
     let gpus = collectGPUStats().map { g -> ProbeResult.GPUResult in
-        ProbeResult.GPUResult(
+        let now = Date()
+        let cached = lastKnownGPUTemp["gpu:\(g.ioClass)"]
+        let fallback: Double?
+        if let (t, at) = cached, now.timeIntervalSince(at) < 60 {
+            fallback = t
+        } else {
+            fallback = nil
+        }
+        var temp = g.temperature ?? gpuTemp ?? fallback
+        if let t = temp, t <= 0 { temp = fallback }
+        return ProbeResult.GPUResult(
             model: g.model,
             ioClass: g.ioClass,
             utilization: g.utilization.map { $0 / 100 },
             renderUtilization: g.renderUtilization.map { $0 / 100 },
             tilerUtilization: g.tilerUtilization.map { $0 / 100 },
-            temperature: g.temperature ?? gpuTemp,
+            temperature: temp,
             coreClockMHz: g.coreClockMHz,
             memoryClockMHz: g.memoryClockMHz,
             poweredOffByAGC: g.poweredOffByAGC

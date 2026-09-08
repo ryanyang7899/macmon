@@ -13,17 +13,52 @@
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
   .dot.on { background: #34d399; box-shadow: 0 0 6px #34d399; }
   .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-  select, button { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
-  select:focus, button:focus { outline: none; border-color: var(--acc); }
+  select, button, input { background: var(--card); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+  select:focus, button:focus, input:focus { outline: none; border-color: var(--acc); }
+  /* 折叠分类 */
+  details.panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; }
+  details.panel > summary { cursor: pointer; padding: 12px 16px; font-size: 14px; font-weight: 600; user-select: none; list-style: none; display: flex; align-items: center; gap: 8px; }
+  details.panel > summary::before { content: '▸'; color: var(--dim); transition: transform .15s; }
+  details.panel[open] > summary::before { transform: rotate(90deg); }
+  details.panel > summary .tag { font-size: 11px; color: var(--dim); font-weight: 400; }
+  .panel-body { padding: 4px 16px 14px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
   .card .label { color: var(--dim); font-size: 12px; margin-bottom: 6px; }
   .card .value { font-size: 22px; font-weight: 600; }
   .card .sub { color: var(--dim); font-size: 11px; margin-top: 4px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
-  .chart { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 10px; }
+  .chart { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
   .chart h3 { font-size: 13px; color: var(--dim); padding: 4px 6px 8px; font-weight: 500; }
   .chart div { height: 180px; }
+  /* 明细表 / 进度条 */
+  .kv-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0 4px; }
+  .kv-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .kv-table td:first-child { color: var(--dim); width: 40%; }
+  .kv-table tr:last-child td { border-bottom: none; }
+  .bar-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim); margin: 2px 0; }
+  .bar-row .name { width: 52px; text-align: right; }
+  .bar-row .track { flex: 1; height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; }
+  .bar-row .fill { height: 100%; background: linear-gradient(90deg, #4f8cff, #7aa7ff); border-radius: 5px; transition: width .4s; }
+  .bar-row .pct { width: 44px; }
+  .vol-row { margin: 6px 0; }
+  .vol-row .meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); margin-bottom: 3px; }
+  /* 传感器表格 */
+  .sensor-tools { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+  .sensor-groups { max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .sensor-groups details { border-bottom: 1px solid var(--border); }
+  .sensor-groups details:last-child { border-bottom: none; }
+  .sensor-groups summary { cursor: pointer; padding: 8px 12px; font-size: 12px; color: var(--dim); user-select: none; }
+  .sensor-groups summary b { color: var(--text); margin-right: 6px; }
+  .sensor-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 12px; padding: 4px 12px 10px; }
+  .sensor-cell { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 4px; border-radius: 4px; }
+  .sensor-cell:hover { background: var(--bg); }
+  .sensor-cell .k { color: var(--dim); flex: 1; }
+  .sensor-cell .v { font-weight: 600; }
+  .sensor-cell button { padding: 0 6px; font-size: 11px; cursor: pointer; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--acc); color: var(--text); border-radius: 12px; padding: 2px 10px; font-size: 12px; }
+  .chip button { border: none; background: transparent; color: var(--dim); cursor: pointer; padding: 0; font-size: 12px; }
   .login { max-width: 300px; margin: 80px auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
   .login h2 { font-size: 16px; margin-bottom: 16px; }
   .login input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 10px; border-radius: 6px; margin-bottom: 12px; font-size: 14px; }
@@ -36,9 +71,9 @@
   .admin-section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px; }
   .admin-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .admin-head h2 { font-size: 14px; font-weight: 600; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-  th { color: var(--dim); font-weight: 500; font-size: 12px; }
+  table.plain { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.plain th, table.plain td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.plain th { color: var(--dim); font-weight: 500; font-size: 12px; }
   td button { padding: 4px 8px; font-size: 12px; margin-right: 4px; }
   td button.danger { color: #f87171; }
   .empty { color: var(--dim); text-align: center; padding: 20px; }
@@ -48,12 +83,15 @@
   .setup-key-row { margin-top: 12px; padding: 10px; background: var(--bg); border: 1px dashed var(--border); border-radius: 8px; font-size: 13px; }
   .setup-key-row code { color: var(--acc); }
   .modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 100; }
-  .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 420px; width: 90%; }
+  .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 460px; width: 90%; max-height: 80vh; overflow-y: auto; }
   .modal-box h3 { font-size: 16px; margin-bottom: 12px; }
   .modal-box p { margin-bottom: 10px; font-size: 13px; }
   .modal-box code { display: inline-block; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 16px; letter-spacing: 1px; color: var(--acc); }
   .modal-box .hint { color: var(--dim); font-size: 12px; }
   .modal-box button { margin-right: 6px; }
+  .ov-group { margin-bottom: 10px; }
+  .ov-group h4 { font-size: 13px; color: var(--dim); margin: 8px 0 4px; }
+  .ov-group label { display: inline-flex; align-items: center; gap: 5px; margin: 3px 14px 3px 0; font-size: 13px; cursor: pointer; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--acc); color: var(--text); padding: 10px 18px; border-radius: 8px; font-size: 13px; opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 200; }
   .toast.show { opacity: 1; }
 </style>
@@ -83,18 +121,104 @@
       <span id="deviceInfo" style="color:var(--dim);font-size:13px"></span>
     </div>
 
-    <div class="cards" id="cards"></div>
+    <!-- 总览面板: 卡片由用户勾选 -->
+    <details class="panel" id="ovPanel" open>
+      <summary>总览面板 <span class="tag" id="ovCount"></span></summary>
+      <div class="panel-body">
+        <div style="text-align:right; margin-bottom:6px">
+          <button onclick="openOverviewModal()">⚙ 配置总览</button>
+        </div>
+        <div class="cards" id="cards" style="margin-bottom:0"></div>
+        <div class="grid" id="ovCharts"></div>
+      </div>
+    </details>
 
-    <div class="grid">
-      <div class="chart"><h3>CPU 占用 (%)</h3><div id="ch_cpu"></div></div>
-      <div class="chart"><h3>CPU 温度 (°C)</h3><div id="ch_cputemp"></div></div>
-      <div class="chart"><h3>GPU 占用 (%)</h3><div id="ch_gpu"></div></div>
-      <div class="chart"><h3>GPU 温度 (°C)</h3><div id="ch_gputemp"></div></div>
-      <div class="chart"><h3>内存使用 (GB)</h3><div id="ch_mem"></div></div>
-      <div class="chart"><h3>网络速率 (MB/s)</h3><div id="ch_net"></div></div>
-      <div class="chart"><h3>磁盘 IO (MB/s)</h3><div id="ch_disk"></div></div>
-      <div class="chart"><h3>电池电量 (%)</h3><div id="ch_batt"></div></div>
-    </div>
+    <!-- 分类明细 -->
+    <details class="panel" data-cat="cpu"><summary>CPU <span class="tag"></span></summary>
+      <div class="panel-body">
+        <div id="cpuCores" style="margin:8px 0"></div>
+        <table class="kv-table" id="cpuTable"></table>
+        <div class="grid">
+          <div class="chart"><h3>CPU 占用 (%)</h3><div id="ch_cpu"></div></div>
+          <div class="chart"><h3>CPU 温度 (°C)</h3><div id="ch_cputemp"></div></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel" data-cat="memory"><summary>内存 <span class="tag"></span></summary>
+      <div class="panel-body">
+        <table class="kv-table" id="memTable"></table>
+        <div class="grid">
+          <div class="chart"><h3>内存细分 (GB)</h3><div id="ch_mem"></div></div>
+          <div class="chart"><h3>Swap 已用 (GB)</h3><div id="ch_swap"></div></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel" data-cat="network"><summary>网络 <span class="tag"></span></summary>
+      <div class="panel-body">
+        <table class="kv-table" id="netTable"></table>
+        <div class="grid">
+          <div class="chart"><h3>网络速率 (MB/s)</h3><div id="ch_net"></div></div>
+          <div class="chart"><h3>累计流量 (GB)</h3><div id="ch_nettotal"></div></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel" data-cat="disk"><summary>磁盘 <span class="tag"></span></summary>
+      <div class="panel-body">
+        <div id="volBars" style="margin:8px 0"></div>
+        <div class="grid">
+          <div class="chart"><h3>磁盘 IO (MB/s)</h3><div id="ch_disk"></div></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel" data-cat="gpu"><summary>GPU <span class="tag"></span></summary>
+      <div class="panel-body">
+        <table class="kv-table" id="gpuTable"></table>
+        <div class="grid">
+          <div class="chart"><h3>GPU 占用 (%)</h3><div id="ch_gpu"></div></div>
+          <div class="chart"><h3>GPU 渲染/切片 (%)</h3><div id="ch_gpur"/></div></div>
+          <div class="chart"><h3>GPU 温度 (°C)</h3><div id="ch_gputemp"></div></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel" data-cat="fans"><summary>风扇 <span class="tag"></span></summary>
+      <div class="panel-body">
+        <table class="kv-table" id="fansTable"></table>
+        <div class="grid" id="fansCharts"></div>
+      </div>
+    </details>
+
+    <details class="panel" data-cat="temps"><summary>温度传感器 <span class="tag" id="tempCount"></span></summary>
+      <div class="panel-body">
+        <div class="sensor-tools">
+          <input type="text" id="tempSearch" placeholder="搜索传感器名…" style="flex:1; min-width:180px" oninput="renderTemps()">
+          <span class="hint" style="color:var(--dim);font-size:12px;align-self:center">点 📈 把传感器加入下方图表 (最多 8 个)</span>
+        </div>
+        <div class="chips" id="tempChips"></div>
+        <div class="sensor-groups" id="tempGroups"></div>
+        <div class="grid" id="tempCharts"></div>
+      </div>
+    </details>
+
+    <details class="panel" data-cat="battery" id="battPanel"><summary>电池 <span class="tag"></span></summary>
+      <div class="panel-body">
+        <table class="kv-table" id="battTable"></table>
+        <div class="grid">
+          <div class="chart"><h3>电池电量 (%)</h3><div id="ch_batt"></div></div>
+          <div class="chart"><h3>电池功率 (W)</h3><div id="ch_battpower"></div></div>
+        </div>
+      </div>
+    </details>
+
+    <details class="panel" data-cat="device"><summary>设备信息 <span class="tag"></span></summary>
+      <div class="panel-body">
+        <table class="kv-table" id="devTableInfo"></table>
+      </div>
+    </details>
   </div>
 
   <div id="viewAdmin" style="display:none">
@@ -106,7 +230,7 @@
           <button onclick="clearUnregistered()">清空列表</button>
         </div>
       </div>
-      <table id="unregTable">
+      <table id="unregTable" class="plain">
         <thead><tr><th>设备名</th><th>IP</th><th>首次上报</th><th>最近上报</th><th>次数</th><th>操作</th></tr></thead>
         <tbody></tbody>
       </table>
@@ -122,7 +246,7 @@
         <h2>已注册设备</h2>
         <button onclick="refreshAdmin()">刷新</button>
       </div>
-      <table id="devTable">
+      <table id="devTable" class="plain">
         <thead><tr><th>名称</th><th>IP</th><th>状态</th><th>最后上报</th><th>操作</th></tr></thead>
         <tbody></tbody>
       </table>
@@ -137,6 +261,19 @@
         <input type="number" id="retentionInput" min="1" max="365" style="width:90px; padding:4px 8px" title="1-365 天">
         <button onclick="openRetentionConfirm()">保存</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="overviewModal" class="modal">
+  <div class="modal-box">
+    <h3>配置总览面板</h3>
+    <p class="hint">勾选要在总览面板显示的指标 (按分类分组):</p>
+    <div id="ovPicker"></div>
+    <div style="margin-top:14px">
+      <button onclick="saveOverview()">保存</button>
+      <button onclick="closeOverviewModal()">取消</button>
+      <button onclick="resetOverview()" style="color:var(--dim)">恢复默认</button>
     </div>
   </div>
 </div>
@@ -167,8 +304,10 @@
 const $ = s => document.querySelector(s);
 let token = localStorage.getItem('macmon_token') || '';
 let currentDevice = '';
+let latestData = null;          // 最近一次 /api/latest 的 data (全量快照)
 const charts = {};
 const HIST_HOURS = 6;
+const loadedCats = new Set();   // 已加载过历史的分类 (懒加载)
 
 async function api(path) {
   const res = await fetch(path, { headers: { 'X-Auth-Token': token } });
@@ -266,6 +405,7 @@ function showView(v) {
   $('#tabMonitor').classList.toggle('active', v === 'monitor');
   $('#tabAdmin').classList.toggle('active', v === 'admin');
   if (v === 'admin') refreshAdmin();
+  else Object.values(charts).forEach(c => c.resize());
 }
 
 async function refreshAdmin() {
@@ -378,6 +518,10 @@ async function login() {
 function onDeviceChange() {
   currentDevice = $('#deviceSelect').value;
   localStorage.setItem('macmon_device', currentDevice);
+  loadedCats.clear();
+  $('#ovCharts').innerHTML = '';
+  $('#fansCharts').innerHTML = '';
+  $('#tempCharts').innerHTML = '';
   refreshLatest();
   refreshHistory();
 }
@@ -386,50 +530,335 @@ function fmtGB(g) { return g >= 1024 ? (g/1024).toFixed(2)+' TB' : g.toFixed(1)+
 function fmtBps(b) { return b >= 1048576 ? (b/1048576).toFixed(1)+' MB/s' : (b/1024).toFixed(0)+' KB/s'; }
 function pct(v) { return ((v||0)*100).toFixed(0)+'%'; }
 
-const cardDefs = [
-  ['cpu','CPU 占用', d => pct(d.cpu.usage), d => `P核 ${pct(d.cpu.pCoreUsage)} / E核 ${pct(d.cpu.eCoreUsage)}`],
-  ['cput','CPU 温度', d => (d.cpu.temp||0).toFixed(1)+'°C', d => `负载 ${(d.cpu.load||[])[0]?.toFixed(1)||'-'}`],
-  ['gpu','GPU 占用', d => pct(d.gpu[0]?.utilization), d => d.gpu[0] ? `渲染 ${pct(d.gpu[0].renderUtilization)}` : ''],
-  ['gput','GPU 温度', d => (d.gpu[0]?.temperature||0).toFixed(1)+'°C', d => d.gpu[0]?.model||''],
-  ['mem','内存', d => fmtGB(d.memory.usedGB), d => `总 ${fmtGB(d.memory.totalGB)} · swap ${d.memory.swapUsedGB.toFixed(1)}G`],
-  ['net','网络', d => `↓ ${fmtBps(d.network.rxBps)}`, d => `↑ ${fmtBps(d.network.txBps)} · ${d.network.interface||''}`],
-  ['disk','磁盘 IO', d => `↓ ${fmtBps(d.disk.readBps)}`, d => `↑ ${fmtBps(d.disk.writeBps)}`],
-  ['batt','电池', d => d.battery.present ? d.battery.chargePercent.toFixed(0)+'%' : '—', d => d.battery.present ? `健康 ${d.battery.health}% · ${d.battery.powerSource}` : '无电池'],
+// ============================================================
+// 总览面板: 可勾选指标卡注册表
+// ============================================================
+// 每项: { id, label, cat, value(d), sub(d), present(d) }
+// value/sub 返回展示字符串; present 返回 false 时该卡隐藏 (如无电池)
+const OVERVIEW_ITEMS = [
+  // CPU
+  { id:'cpu',   cat:'CPU',  label:'CPU 占用', value:d=>pct(d.cpu?.usage), sub:d=>`P核 ${pct(d.cpu?.pCoreUsage)} / E核 ${pct(d.cpu?.eCoreUsage)}`, present:d=>!!d.cpu },
+  { id:'cput',  cat:'CPU',  label:'CPU 温度', value:d=>(d.cpu?.temp||0).toFixed(1)+'°C', sub:d=>`负载 ${(d.cpu?.load||[])[0]?.toFixed(1)||'-'}`, present:d=>!!d.cpu },
+  { id:'cpufreq',cat:'CPU', label:'CPU 频率', value:d=>(d.cpu?.freqMHz||0)>0 ? (d.cpu.freqMHz/1000).toFixed(2)+' GHz' : '—', sub:d=>`${d.device?.cores||'?'} 核`, present:d=>!!d.cpu },
+  { id:'cpuload',cat:'CPU', label:'系统负载', value:d=>((d.cpu?.load||[])[0]||0).toFixed(2), sub:d=>`5m ${((d.cpu?.load||[])[1]||0).toFixed(2)} · 15m ${((d.cpu?.load||[])[2]||0).toFixed(2)}`, present:d=>!!d.cpu },
+  // 内存
+  { id:'mem',   cat:'内存',  label:'内存使用', value:d=>fmtGB(d.memory?.usedGB||0), sub:d=>`总 ${fmtGB(d.memory?.totalGB||0)} · swap ${(d.memory?.swapUsedGB||0).toFixed(1)}G`, present:d=>!!d.memory },
+  { id:'mempress',cat:'内存',label:'内存压力', value:d=>({normal:'正常',warning:'偏高',critical:'过高'}[d.memory?.pressureLevel]||d.memory?.pressureLevel||'-'), sub:d=>`压缩 ${fmtGB(d.memory?.compressedGB||0)}`, present:d=>!!d.memory },
+  { id:'memapp',cat:'内存',  label:'App 内存', value:d=>fmtGB(d.memory?.appGB||0), sub:d=>`联动 ${fmtGB(d.memory?.wiredGB||0)}`, present:d=>!!d.memory },
+  { id:'memcache',cat:'内存',label:'缓存', value:d=>fmtGB(d.memory?.cacheGB||0), sub:d=>`可清除 ${fmtGB(d.memory?.purgeableGB||0)}`, present:d=>!!d.memory },
+  { id:'memswap',cat:'内存', label:'Swap 已用', value:d=>(d.memory?.swapUsedGB||0).toFixed(2)+' GB', sub:d=>`换页 ↑${d.memory?.swapouts||0} ↓${d.memory?.swapins||0}`, present:d=>!!d.memory },
+  // 网络
+  { id:'net',   cat:'网络',  label:'网络', value:d=>`↓ ${fmtBps(d.network?.rxBps||0)}`, sub:d=>`↑ ${fmtBps(d.network?.txBps||0)} · ${d.network?.interface||''}`, present:d=>!!d.network },
+  { id:'wifi',  cat:'网络',  label:'WiFi 速率', value:d=>(d.network?.wifiRateMbps||0)>0 ? d.network.wifiRateMbps.toFixed(0)+' Mbps' : '—', sub:d=>d.network?.localIP||'', present:d=>!!d.network },
+  { id:'nettotal',cat:'网络',label:'累计流量', value:d=>fmtGB((d.network?.rxTotalBytes||0)/1e9), sub:d=>`↑ ${fmtGB((d.network?.txTotalBytes||0)/1e9)}`, present:d=>!!d.network },
+  // 磁盘
+  { id:'disk',  cat:'磁盘',  label:'磁盘 IO', value:d=>`↓ ${fmtBps(d.disk?.readBps||0)}`, sub:d=>`↑ ${fmtBps(d.disk?.writeBps||0)}`, present:d=>!!d.disk },
+  { id:'vol',   cat:'磁盘',  label:'系统卷剩余', value:d=>{ const v=(d.disk?.volumes||[])[0]; return v?fmtGB(v.freeGB):'—'; }, sub:d=>{ const v=(d.disk?.volumes||[])[0]; return v?`总 ${fmtGB(v.totalGB)}`:''; }, present:d=>(d.disk?.volumes||[]).length>0 },
+  // GPU
+  { id:'gpu',   cat:'GPU',  label:'GPU 占用', value:d=>pct(d.gpu?.[0]?.utilization), sub:d=>d.gpu?.[0]?`渲染 ${pct(d.gpu[0].renderUtilization)}`:'', present:d=>(d.gpu||[]).length>0 },
+  { id:'gput',  cat:'GPU',  label:'GPU 温度', value:d=>(d.gpu?.[0]?.temperature||0).toFixed(1)+'°C', sub:d=>d.gpu?.[0]?.model||'', present:d=>(d.gpu||[]).length>0 },
+  { id:'gputiler',cat:'GPU',label:'GPU 切片', value:d=>pct(d.gpu?.[0]?.tilerUtilization), sub:d=>d.gpu?.[0]?.ioClass||'', present:d=>(d.gpu||[]).length>0 },
+  // 风扇 (键名机型相关, 动态)
+  { id:'fan0', cat:'风扇', label:'风扇 1', value:d=>{ const f=d.fans||{}; const k=Object.keys(f).find(k=>/^F0Ac$/.test(k)); return k?Math.round(f[k])+' RPM':'—'; }, sub:d=>{ const f=d.fans||{}; const mx=Object.keys(f).find(k=>/^F0Mx$/.test(k)); return mx?`最高 ${Math.round(f[mx])} RPM`:''; }, present:d=>Object.keys(d.fans||{}).length>0 },
+  { id:'fan1', cat:'风扇', label:'风扇 2', value:d=>{ const f=d.fans||{}; const k=Object.keys(f).find(k=>/^F1Ac$/.test(k)); return k?Math.round(f[k])+' RPM':'—'; }, sub:d=>{ const f=d.fans||{}; const mx=Object.keys(f).find(k=>/^F1Mx$/.test(k)); return mx?`最高 ${Math.round(f[mx])} RPM`:''; }, present:d=>Object.keys(d.fans||{}).some(k=>/^F1Ac$/.test(k)) },
+  // 电池
+  { id:'batt', cat:'电池', label:'电池', value:d=>d.battery?.present ? d.battery.chargePercent.toFixed(0)+'%' : '—', sub:d=>d.battery?.present?`健康 ${d.battery.health??'?'}% · ${d.battery.powerSource||''}`:'无电池', present:d=>true },
+  { id:'battpower', cat:'电池', label:'电池功率', value:d=>{ const b=d.battery||{}; return b.batteryPower?b.batteryPower.toFixed(1)+' W':(b.adapterPower?`${b.adapterPower.toFixed(1)} W (外设)`:'—'); }, sub:d=>d.battery?.present?`电压 ${d.battery.voltage?.toFixed(1)||'-'}V · ${d.battery.amperage||0}mA`:'' , present:d=>true },
+  // 设备
+  { id:'uptime', cat:'设备', label:'运行时长', value:d=>{ const s=Math.floor(d.device?.uptimeSeconds||0); return `${Math.floor(s/86400)}天${Math.floor(s%86400/3600)}h`; }, sub:d=>d.device?.os||'', present:d=>!!d.device },
+  { id:'ip', cat:'设备', label:'本机 IP', value:d=>d.device?.localIP||d.network?.localIP||'—', sub:d=>d.device?.chip||'', present:d=>!!d.device },
 ];
 
-function renderCards(d) {
-  $('#cards').innerHTML = cardDefs.map(([id,label,fn,sub]) => `
-    <div class="card"><div class="label">${label}</div><div class="value">${fn(d)}</div><div class="sub">${sub(d)}</div></div>`).join('');
+const OVERVIEW_DEFAULT = ['cpu','cput','gpu','gput','mem','net','disk','batt'];
+function getOverviewSel() {
+  try { return JSON.parse(localStorage.getItem('macmon_overview_cards')) || OVERVIEW_DEFAULT; }
+  catch(e) { return OVERVIEW_DEFAULT; }
+}
+function setOverviewSel(arr) { localStorage.setItem('macmon_overview_cards', JSON.stringify(arr)); }
+
+function renderOverviewCards(d) {
+  const sel = getOverviewSel();
+  const items = OVERVIEW_ITEMS.filter(it => sel.includes(it.id) && it.present(d));
+  $('#ovCount').textContent = `${items.length} 项`;
+  $('#cards').innerHTML = items.map(it => `
+    <div class="card"><div class="label">${it.label}</div><div class="value">${it.value(d)}</div><div class="sub">${it.sub(d)}</div></div>`).join('')
+    || '<div class="empty">未勾选任何指标, 点右上 ⚙ 配置</div>';
 }
 
+// 总览勾选弹窗
+function openOverviewModal() {
+  const sel = new Set(getOverviewSel());
+  const cats = [...new Set(OVERVIEW_ITEMS.map(i=>i.cat))];
+  $('#ovPicker').innerHTML = cats.map(cat => `
+    <div class="ov-group">
+      <h4>${cat}</h4>
+      ${OVERVIEW_ITEMS.filter(i=>i.cat===cat).map(i => `
+        <label><input type="checkbox" data-ov="${i.id}" ${sel.has(i.id)?'checked':''}> ${i.label}</label>`).join('')}
+    </div>`).join('');
+  $('#overviewModal').style.display = 'flex';
+}
+function closeOverviewModal() { $('#overviewModal').style.display = 'none'; }
+$('#overviewModal').addEventListener('click', e => { if (e.target === $('#overviewModal')) closeOverviewModal(); });
+function saveOverview() {
+  const sel = [...document.querySelectorAll('[data-ov]')].filter(c=>c.checked).map(c=>c.dataset.ov);
+  setOverviewSel(sel);
+  closeOverviewModal();
+  if (latestData) renderOverviewCards(latestData);
+  toast('总览配置已保存');
+}
+function resetOverview() {
+  document.querySelectorAll('[data-ov]').forEach(c => c.checked = OVERVIEW_DEFAULT.includes(c.dataset.ov));
+}
+
+// ============================================================
+// 分类明细区
+// ============================================================
+function kvRows(rows) {
+  return rows.filter(r=>r).map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+}
+
+// 逐核占用横条
+function renderCpuCores(d) {
+  const cores = d.cpu?.usagePerCore || [];
+  $('#cpuCores').innerHTML = cores.map((u,i) => `
+    <div class="bar-row">
+      <span class="name">#${i}</span>
+      <div class="track"><div class="fill" style="width:${Math.min(100,u*100).toFixed(0)}%"></div></div>
+      <span class="pct">${(u*100).toFixed(0)}%</span>
+    </div>`).join('') || '<div class="empty">暂无数据</div>';
+}
+
+function renderMemTable(d) {
+  const m = d.memory || {};
+  $('#memTable').innerHTML = kvRows([
+    ['总容量', fmtGB(m.totalGB||0)],
+    ['已用 / 空闲', `${fmtGB(m.usedGB||0)} / ${fmtGB(m.freeGB||0)}`],
+    ['活跃 / 非活跃', `${fmtGB(m.activeGB||0)} / ${fmtGB(m.inactiveGB||0)}`],
+    ['联动 (wired)', fmtGB(m.wiredGB||0)],
+    ['App 内存', fmtGB(m.appGB||0)],
+    ['压缩', fmtGB(m.compressedGB||0)],
+    ['缓存 (可清除+外部)', `${fmtGB(m.cacheGB||0)} (可清除 ${fmtGB(m.purgeableGB||0)})`],
+    ['投机 (speculative)', fmtGB(m.speculativeGB||0)],
+    ['Swap 总量/已用/空闲', `${fmtGB(m.swapTotalGB||0)} / ${fmtGB(m.swapUsedGB||0)} / ${fmtGB(m.swapFreeGB||0)}`],
+    ['换页 进/出', `${m.swapins||0} / ${m.swapouts||0}`],
+    ['内存压力', {normal:'正常',warning:'偏高',critical:'过高'}[m.pressureLevel]||m.pressureLevel||'-'],
+  ]);
+}
+
+function renderNetTable(d) {
+  const n = d.network || {};
+  $('#netTable').innerHTML = kvRows([
+    ['接口', `${n.interface||'—'} ${n.status?'<span class="badge on">已连接</span>':'<span class="badge off">断开</span>'}`],
+    ['本地 IP', n.localIP||'—'],
+    ['实时速率', `↓ ${fmtBps(n.rxBps||0)} · ↑ ${fmtBps(n.txBps||0)}`],
+    ['累计下载', fmtGB((n.rxTotalBytes||0)/1e9)],
+    ['累计上传', fmtGB((n.txTotalBytes||0)/1e9)],
+    ['WiFi 链路速率', (n.wifiRateMbps||0)>0 ? n.wifiRateMbps.toFixed(0)+' Mbps' : '—'],
+  ]);
+}
+
+function renderVolBars(d) {
+  const vols = d.disk?.volumes || [];
+  $('#volBars').innerHTML = vols.map(v => {
+    const usedPct = v.totalGB > 0 ? Math.min(100, (1 - v.freeGB/v.totalGB)*100) : 0;
+    return `
+    <div class="vol-row">
+      <div class="meta"><span>${esc(v.name)}</span><span>已用 ${fmtGB(v.totalGB-v.freeGB)} / ${fmtGB(v.totalGB)} (${usedPct.toFixed(0)}%)</span></div>
+      <div class="track" style="height:12px"><div class="fill" style="width:${usedPct.toFixed(0)}%; background:${usedPct>85?'linear-gradient(90deg,#f87171,#fbbf24)':'linear-gradient(90deg,#34d399,#4f8cff)'}"></div></div>
+    </div>`;
+  }).join('') || '<div class="empty">暂无卷信息</div>';
+}
+
+function renderGpuTable(d) {
+  const g = (d.gpu||[])[0] || {};
+  $('#gpuTable').innerHTML = kvRows([
+    ['型号', g.model||'—'],
+    ['总占用', pct(g.utilization)],
+    ['渲染占用', pct(g.renderUtilization)],
+    ['切片 (tiler) 占用', pct(g.tilerUtilization)],
+    ['温度', (g.temperature||0)>0 ? g.temperature.toFixed(1)+'°C' : '—'],
+    ['AGC 断电', g.poweredOffByAGC ? '是' : '否'],
+  ]);
+}
+
+// 风扇: 键名机型相关, 从数据动态发现
+function fanInfo(d, idx) {
+  const f = d.fans || {};
+  const g = sfx => { const k = Object.keys(f).find(k => k === `F${idx}${sfx}`); return k ? f[k] : undefined; };
+  if (g('Ac') === undefined) return null;
+  return { ac:g('Ac'), mn:g('Mn'), mx:g('Mx'), tg:g('Tg'), st:g('St'), mode:g('Md'), name:g('Nm') };
+}
+
+function renderFans(d) {
+  const fans = [];
+  for (let i = 0; i < 8; i++) {
+    const info = fanInfo(d, i);
+    if (!info) break;
+    fans.push([i, info]);
+  }
+  const wrap = $('#fansTable').closest('.panel-body');
+  if (!fans.length) { $('#fansTable').innerHTML = '<tr><td class="empty">该设备无风扇数据</td></tr>'; $('#fansCharts').innerHTML=''; return; }
+  $('#fansTable').innerHTML = fans.map(([i,f]) => kvRows([
+    [`风扇 ${i+1} 当前转速`, `${Math.round(f.ac)} RPM`],
+    [`风扇 ${i+1} 最低/最高`, `${Math.round(f.mn||0)} / ${Math.round(f.mx||0)} RPM`],
+    [`风扇 ${i+1} 目标转速`, f.tg!==undefined ? Math.round(f.tg)+' RPM' : '—'],
+    [`风扇 ${i+1} 状态/模式`, `状态 ${f.st??'—'} · 模式 ${f.mode??'—'}`],
+  ])).join('');
+  // 动态转速曲线 (每风扇一个)
+  $('#fansCharts').innerHTML = fans.map(([i]) =>
+    `<div class="chart"><h3>风扇 ${i+1} 转速 (RPM)</h3><div id="ch_fan${i}"></div></div>`).join('');
+}
+
+function renderTemps() {
+  const temps = latestData?.temps || {};
+  const q = ($('#tempSearch').value||'').toUpperCase();
+  $('#tempCount').textContent = `${Object.keys(temps).length} 个`;
+  const groups = {};
+  for (const [k,v] of Object.entries(temps)) {
+    if (q && !k.toUpperCase().includes(q)) continue;
+    const g = k.slice(0,2);
+    (groups[g] = groups[g] || []).push([k,v]);
+  }
+  const chosen = getTempSel();
+  $('#tempChips').innerHTML = chosen.map(p => `<span class="chip">${p}<button onclick="removeTempSel('${p}')">✕</button></span>`).join('');
+  $('#tempCharts').innerHTML = chosen.map(p =>
+    `<div class="chart"><h3>传感器 ${p} (°C)</h3><div id="ch_temp_${p}"></div></div>`).join('');
+  $('#tempGroups').innerHTML = Object.keys(groups).sort().map(g => `
+    <details ${Object.keys(groups).length<=3?'open':''}>
+      <summary><b>${g}</b>${groups[g].length} 个</summary>
+      <div class="sensor-grid">
+        ${groups[g].map(([k,v]) => `
+          <div class="sensor-cell">
+            <span class="k">${k}</span>
+            <span class="v">${(v||0).toFixed(1)}°C</span>
+            <button onclick="addTempSel('${k}')" title="加入图表">📈</button>
+          </div>`).join('')}
+      </div>
+    </details>`).join('') || '<div class="empty" style="padding:16px">无匹配传感器</div>';
+}
+
+const TEMP_SEL_KEY = 'macmon_temp_charts';
+function getTempSel() {
+  try { return JSON.parse(localStorage.getItem(TEMP_SEL_KEY)) || []; } catch(e) { return []; }
+}
+function addTempSel(k) {
+  const sel = getTempSel();
+  if (sel.includes(k)) { toast('已在该图表列表'); return; }
+  if (sel.length >= 8) { toast('最多 8 个传感器图表'); return; }
+  sel.push(k);
+  localStorage.setItem(TEMP_SEL_KEY, JSON.stringify(sel));
+  renderTemps();
+  loadTempCharts();
+  toast(`已加入传感器 ${k}`);
+}
+function removeTempSel(k) {
+  const sel = getTempSel().filter(x => x !== k);
+  localStorage.setItem(TEMP_SEL_KEY, JSON.stringify(sel));
+  renderTemps();
+}
+
+function renderBattTable(d) {
+  const b = d.battery || {};
+  $('#battTable').innerHTML = b.present ? kvRows([
+    ['电量', b.chargePercent.toFixed(0)+'%'],
+    ['健康度', (b.health??'—')+'%'+(b.maxCapacity?` (设计 ${fmtGB(0)}${b.designedCapacity?' · 设计容量 '+b.designedCapacity+'mAh':''})`:'')],
+    ['循环次数', b.cycles ?? '—'],
+    ['充电状态', b.isCharging ? '⚡ 充电中' : b.powerSource||'—'],
+    ['剩余时间', b.timeToEmptyMinutes ? `${Math.floor(b.timeToEmptyMinutes/60)}h${b.timeToEmptyMinutes%60}m` : (b.timeToFullMinutes?`充满还需 ${Math.floor(b.timeToFullMinutes/60)}h${b.timeToFullMinutes%60}m`:'—')],
+    ['电压 / 电流', `${b.voltage?.toFixed(2)||'—'} V / ${b.amperage||0} mA`],
+    ['电池功率', b.batteryPower ? b.batteryPower.toFixed(2)+' W' : '—'],
+    ['适配器功率', b.acAdapterWatts ? b.acAdapterWatts+' W' : (b.adapterPower?b.adapterPower.toFixed(1)+' W':'—')],
+  ]) : '<tr><td class="empty">该设备没有电池</td></tr>';
+}
+
+function renderDeviceInfo(d) {
+  const i = d.device || {};
+  const s = Math.floor(i.uptimeSeconds||0);
+  $('#devTableInfo').innerHTML = kvRows([
+    ['型号', i.model||'—'],
+    ['芯片', i.chip||'—'],
+    ['系统', i.os||'—'],
+    ['核心', `${i.cores||'—'} 核 (性能 ${i.perfCores??'?'} + 能效 ${i.effCores??'?'})`],
+    ['本机 IP', i.localIP||'—'],
+    ['运行时长', `${Math.floor(s/86400)} 天 ${Math.floor(s%86400/3600)} 小时`],
+  ]);
+}
+
+// 电池分类显隐 (无电池整类隐藏)
+function updateBatteryVisibility(d) {
+  $('#battPanel').style.display = d.battery?.present ? '' : 'none';
+  $('#fansTable').closest('details').style.display = Object.keys(d.fans||{}).length ? '' : 'none';
+}
+
+// 最新快照 → 渲染总览 + 已展开分类
 async function refreshLatest() {
   if (!currentDevice) return;
   try {
     const d = await api('/api/latest?device='+currentDevice);
     $('#statusDot').classList.add('on');
+    latestData = d.data;
     const info = d.data.device || {};
-    const uptime = Math.floor(d.data.device?.uptimeSeconds||0);
+    const uptime = Math.floor(info.uptimeSeconds||0);
     $('#deviceInfo').textContent = `${info.chip||''} ${info.model||''} · ${info.os||''} · 已运行 ${Math.floor(uptime/86400)}天${Math.floor(uptime%86400/3600)}h`;
-    renderCards(d.data);
+    renderOverviewCards(d.data);
+    updateBatteryVisibility(d.data);
+    // 只重渲染已展开分类的明细 (避免折叠区无效计算)
+    document.querySelectorAll('#viewMonitor details.panel[data-cat]').forEach(det => {
+      if (!det.open) return;
+      renderCatDetail(det.dataset.cat, d.data);
+    });
   } catch(e) { /* 401 handled */ }
 }
 
-const chartDefs = [
-  ['ch_cpu','CPU 占用', ['cpu.usage'], 'percent'],
-  ['ch_cputemp','CPU 温度', ['cpu.temp'], 'temp'],
-  ['ch_gpu','GPU 占用', ['gpu.0.utilization'], 'percent'],
-  ['ch_gputemp','GPU 温度', ['gpu.0.temperature'], 'temp'],
-  ['ch_mem','内存使用', ['memory.usedGB'], 'gb'],
-  ['ch_net','网络速率', ['network.rxBps','network.txBps'], 'bps'],
-  ['ch_disk','磁盘 IO', ['disk.readBps','disk.writeBps'], 'bps'],
-  ['ch_batt','电池电量', ['battery.chargePercent'], 'percent'],
-];
+function renderCatDetail(cat, d) {
+  switch(cat) {
+    case 'cpu': renderCpuCores(d); renderFansTag(); break;
+    case 'memory': renderMemTable(d); break;
+    case 'network': renderNetTable(d); break;
+    case 'disk': renderVolBars(d); break;
+    case 'gpu': renderGpuTable(d); break;
+    case 'fans': renderFans(d); break;
+    case 'temps': renderTemps(); break;
+    case 'battery': renderBattTable(d); break;
+    case 'device': renderDeviceInfo(d); break;
+  }
+}
 
-const chartNames = { 'network.rxBps':'↓ 下载','network.txBps':'↑ 上传','disk.readBps':'↓ 读','disk.writeBps':'↑ 写' };
+// 分类 summary 右侧摘要 tag
+function renderFansTag() {}
 
-function initChart(el, title) {
+// 分类折叠展开时: 渲染明细 + 懒加载历史
+document.addEventListener('toggle', e => {
+  const det = e.target;
+  if (det.tagName !== 'DETAILS' || !det.hasAttribute('data-cat') || !det.open) return;
+  const cat = det.dataset.cat;
+  if (latestData) renderCatDetail(cat, latestData);
+  if (!loadedCats.has(cat)) { loadedCats.add(cat); loadCatHistory(cat); }
+}, true);
+
+// ============================================================
+// 历史曲线
+// ============================================================
+// 各分类图表定义: [id, 标题, paths, 格式]
+const CAT_CHARTS = {
+  cpu:     [['ch_cpu','CPU 占用',['cpu.usage'],'percent'], ['ch_cputemp','CPU 温度',['cpu.temp'],'temp']],
+  memory:  [['ch_mem','内存细分',['memory.usedGB','memory.activeGB','memory.wiredGB','memory.compressedGB'],'gb'], ['ch_swap','Swap 已用',['memory.swapUsedGB'],'gb']],
+  network: [['ch_net','网络速率',['network.rxBps','network.txBps'],'bps'], ['ch_nettotal','累计流量',['network.rxTotalBytes','network.txTotalBytes'],'bytes']],
+  disk:    [['ch_disk','磁盘 IO',['disk.readBps','disk.writeBps'],'bps']],
+  gpu:     [['ch_gpu','GPU 占用',['gpu.0.utilization'],'percent'], ['ch_gpur','渲染/切片',['gpu.0.renderUtilization','gpu.0.tilerUtilization'],'percent'], ['ch_gputemp','GPU 温度',['gpu.0.temperature'],'temp']],
+  battery: [['ch_batt','电池电量',['battery.chargePercent'],'percent'], ['ch_battpower','电池功率',['battery.batteryPower'],'raw']],
+};
+
+const chartNames = { 'network.rxBps':'↓ 下载','network.txBps':'↑ 上传','disk.readBps':'↓ 读','disk.writeBps':'↑ 写',
+  'memory.usedGB':'已用','memory.activeGB':'活跃','memory.wiredGB':'联动','memory.compressedGB':'压缩',
+  'network.rxTotalBytes':'↓ 累计','network.txTotalBytes':'↑ 累计',
+  'gpu.0.renderUtilization':'渲染','gpu.0.tilerUtilization':'切片' };
+
+function initChart(el) {
   if (charts[el]) return;
-  charts[el] = echarts.init(document.getElementById(el), 'dark');
+  const dom = document.getElementById(el);
+  if (!dom) return;
+  charts[el] = echarts.init(dom, 'dark');
   charts[el].setOption({
     grid: { left: 40, right: 12, top: 8, bottom: 24 },
     tooltip: { trigger: 'axis' },
@@ -441,26 +870,64 @@ function initChart(el, title) {
 }
 
 function conv(path, v) {
-  const fmt = chartDefs.find(c=>c[2].includes(path))?.[3]||'raw';
-  if (fmt==='percent') return (v||0)*100;
-  if (fmt==='bps') return (v||0)/1048576;
+  // 累计流量统一转 GB; 其余按需
+  if (path.includes('TotalBytes')) return (v||0)/1e9;
   return v;
 }
 
-async function refreshHistory() {
-  if (!currentDevice) return;
+async function fetchHistory(paths) {
+  return api(`/api/history?device=${currentDevice}&hours=${HIST_HOURS}&paths=${paths.join(',')}`);
+}
+
+function fillChart(def, h) {
+  const [el, name, paths] = def;
+  initChart(el);
+  if (!charts[el]) return;
+  const series = paths.map(p => {
+    const name2 = chartNames[p] || name;
+    const data = (h.series||[]).filter(s => s.values[p]!==undefined).map(s => [s.ts*1000, conv(p, s.values[p])]);
+    return { name: name2, type: 'line', showSymbol: false, smooth: true, data, lineStyle:{width:1.5} };
+  });
+  charts[el].setOption({ series });
+}
+
+// 加载某分类的历史 (图表先渲染骨架, 数据一次请求)
+async function loadCatHistory(cat) {
+  if (cat === 'fans') {
+    // 动态风扇曲线: 依赖 latest 中发现的 F<n>Ac
+    const fanIdx = [];
+    for (let i = 0; i < 8; i++) { if (fanInfo(latestData||{}, i)) fanIdx.push(i); else break; }
+    await Promise.all(fanIdx.map(async i => {
+      const def = [`ch_fan${i}`, `风扇 ${i+1}`, [`fans.F${i}Ac`], 'raw'];
+      try { fillChart(def, await fetchHistory(def[2])); } catch(e) {}
+    }));
+    return;
+  }
+  if (cat === 'temps') { loadTempCharts(); return; }
+  const defs = CAT_CHARTS[cat];
+  if (!defs) return;
+  const paths = [...new Set(defs.flatMap(d => d[2]))];
   try {
-    for (const [el, name, paths] of chartDefs) {
-      initChart(el, name);
-      const h = await api(`/api/history?device=${currentDevice}&hours=${HIST_HOURS}&paths=${paths.join(',')}`);
-      const series = paths.map(p => {
-        const name2 = chartNames[p] || name;
-        const data = h.series.filter(s => s.values[p]!==undefined).map(s => [s.ts*1000, conv(p, s.values[p])]);
-        return { name: name2, type: 'line', showSymbol: false, smooth: true, data, lineStyle:{width:1.5} };
-      });
-      charts[el].setOption({ series });
-    }
+    const h = await fetchHistory(paths);
+    defs.forEach(def => fillChart(def, h));
   } catch(e) {}
+}
+
+// 传感器图表 (用户点选, 单独请求)
+async function loadTempCharts() {
+  const sel = getTempSel();
+  await Promise.all(sel.map(async p => {
+    const def = [`ch_temp_${p}`, `传感器 ${p}`, [`temps.${p}`], 'temp'];
+    try { fillChart(def, await fetchHistory(def[2])); } catch(e) {}
+  }));
+}
+
+async function refreshHistory() {
+  // 只刷新当前展开 + 已加载的分类
+  document.querySelectorAll('#viewMonitor details.panel[data-cat]').forEach(det => {
+    if (det.open && loadedCats.has(det.dataset.cat)) loadCatHistory(det.dataset.cat);
+  });
+  // 总览里若勾了图表区无需历史 (卡片用实时数据)
 }
 
 async function loadDevices() {

@@ -1,10 +1,12 @@
 //
 //  SMC.swift
-//  只读 SMC 访问 (温度 / 风扇),基于 exelban/stats 的 SMC.swift 精简改写 (MIT License)
+//  SMC 访问 (温度 / 风扇),基于 exelban/stats 的 SMC.swift 精简改写 (MIT License)
 //  https://github.com/exelban/stats/blob/master/SMC/smc.swift
 //
 //  原理: 通过 IOKit 打开 AppleSMC 服务, 用 io_connect 结构体方法读写 SMC key。
-//  只保留读取, 去掉风扇/模式等写操作。
+//
+//  权限: 读取无需特权; 写入 (风扇转速/模式) 需要 root, 因此写操作只在
+//  macmonhelper (以 root 常驻的 LaunchDaemon) 进程里调用, App 侧永远只读。
 //
 
 import Foundation
@@ -252,6 +254,30 @@ public final class SMC {
             list.append(output.key.fourCharString())
         }
         return list
+    }
+
+    // MARK: - 写入 (需要 root)
+
+    /// 写入一个 SMC key 的原始字节。
+    ///
+    /// 注意: 内核可能返回 kIOReturnSuccess 而 SMC 固件实际拒绝写入,
+    /// 因此调用方必须回读校验 (见 FanController.writeVerified)。
+    public func write(_ key: String, bytes: [UInt8], dataSize: UInt32) -> kern_return_t {
+        var input = SMCKeyData_t()
+        var output = SMCKeyData_t()
+
+        input.key = UInt32(fromFourChar: key)
+        input.data8 = SMCCommand.writeBytes.rawValue
+        input.keyInfo.dataSize = dataSize
+
+        // 把 [UInt8] 拷进定长 32 字节元组
+        withUnsafeMutableBytes(of: &input.bytes) { dst in
+            for (i, b) in bytes.prefix(32).enumerated() {
+                dst[i] = b
+            }
+        }
+
+        return call(SMCCommand.kernelIndex.rawValue, input: &input, output: &output)
     }
 
     // MARK: - 底层调用

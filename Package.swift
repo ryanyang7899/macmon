@@ -28,6 +28,16 @@ let package = Package(
                 .linkedFramework("CoreWLAN"),
             ]
         ),
+        // root 特权 helper: 以 LaunchDaemon 常驻, 通过 XPC 提供风扇控制
+        .executableTarget(
+            name: "macmonhelper",
+            dependencies: ["MacmonCore"],
+            path: "Sources/macmonhelper",
+            linkerSettings: [
+                .linkedFramework("IOKit"),
+                .linkedFramework("Security"),
+            ]
+        ),
         // macOS 菜单栏 App
         .executableTarget(
             name: "macmonapp",

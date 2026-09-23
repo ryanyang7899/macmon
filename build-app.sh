@@ -6,11 +6,17 @@ cd "$(dirname "$0")"
 
 APP_NAME="Macmon"
 BUNDLE_ID="com.macmon.app"
-VERSION="0.1.3"
+VERSION="0.1.6"
 ICON_PATH="$(pwd)/Resources/AppIcon.icns"
 
 echo "==> 构建 release (含 macmonapp)"
 swift build -c release
+
+# CLI agent 统一签名标识: root 的风扇控制 helper 只接受标识 com.macmon.app 的
+# 对端, SwiftPM 默认的 macmon-<hash> 会被系统在建立 XPC 连接时拒绝。
+# (install-agent.sh 也会再签一次, 这里签是为了让 release 产物直接可用)
+echo "==> 重签名 CLI agent"
+codesign --force --sign - --identifier com.macmon.app .build/release/macmon
 
 echo "==> 组装 .app bundle"
 APP_DIR="dist/$APP_NAME.app"
@@ -23,6 +29,16 @@ if [[ -f "$ICON_PATH" ]]; then
     mkdir -p "$APP_DIR/Contents/Resources"
     cp "$ICON_PATH" "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
+
+# 风扇控制 helper: root LaunchDaemon 二进制 + 安装/卸载脚本
+# (二进制放 Contents/Library/PrivilegedHelperTools, 与 SMJobBless 约定一致)
+echo "==> 打包风扇控制 helper"
+HELPER_LABEL="com.macmon.app.helper"
+mkdir -p "$APP_DIR/Contents/Library/PrivilegedHelperTools"
+cp .build/release/macmonhelper "$APP_DIR/Contents/Library/PrivilegedHelperTools/$HELPER_LABEL"
+cp Resources/helper/"$HELPER_LABEL".plist "$APP_DIR/Contents/Resources/"
+cp Resources/helper/install-helper.sh Resources/helper/uninstall-helper.sh "$APP_DIR/Contents/Resources/"
+chmod +x "$APP_DIR/Contents/Resources/install-helper.sh" "$APP_DIR/Contents/Resources/uninstall-helper.sh"
 
 cat > "$APP_DIR/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

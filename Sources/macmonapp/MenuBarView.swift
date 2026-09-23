@@ -12,10 +12,10 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             MonitorContentView(model: model)
 
-            Divider()
+            Divider().opacity(0.3)
 
             Button {
                 openWindow(id: "monitor")
@@ -23,8 +23,10 @@ struct MenuBarView: View {
                 Label("窗口模式 (可固定置顶)", systemImage: "macwindow.on.rectangle")
                     .frame(maxWidth: .infinity)
             }
+            .glassButton(prominent: true)
 
-            HStack {
+            // buttonStyle 走环境传递, 整行一次性套用玻璃
+            HStack(spacing: 4) {
                 Button("设置…") { openWindow(id: "main") }
                 Spacer()
                 Button("立即采集") { model.collectNow() }
@@ -33,11 +35,13 @@ struct MenuBarView: View {
                 Spacer()
                 Button("退出") { NSApplication.shared.terminate(nil) }
             }
+            .controlSize(.small)
+            .glassButton()
 
-            Divider()
+            Divider().opacity(0.3)
         }
-        .padding(10)
-        .frame(width: 300)
+        .padding(12)
+        .frame(width: 320)
     }
 }
 
@@ -83,6 +87,8 @@ struct MonitorContentView: View {
             statTiles(p)
         }
         itemCharts(history: model.localHistory)
+        // 必须用服务器认得的规范名: 本地 config.deviceID 只是上报提示, 服务器可能已改名
+        FanControlBlock(device: model.localDeviceName, data: l, remote: model.remoteFan)
         Divider()
     }
 
@@ -100,6 +106,10 @@ struct MonitorContentView: View {
         } else if let p = model.monitorHistory[name]?.last {
             statTiles(p)
             itemCharts(history: model.monitorHistory[name] ?? [])
+            // 风扇控制: 操作的就是这台被监控设备 (可能是远端机器)
+            if let data = entry?.latest?.data {
+                FanControlBlock(device: name, data: data, remote: model.remoteFan)
+            }
         } else {
             Text("等待数据…").foregroundColor(.secondary).font(.caption)
         }
@@ -118,7 +128,7 @@ struct MonitorContentView: View {
                     .foregroundColor(b >= 20 || charging ? .green : .red)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 1)
-                    .background(Capsule().fill(Color.green.opacity(0.12)))
+                    .background(Capsule().fill(Color.green.opacity(0.07)))
             }
             Text(model.statusText)
                 .font(.caption2)
@@ -155,13 +165,13 @@ struct MonitorContentView: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .background(
-            // 底纹: 浅色打底 + 按百分比从左向右填充
+            // 底纹: 浅色打底 + 按百分比从左向右填充 (大圆角 + 低透明度, 贴合液态玻璃观感)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 6).fill(color.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 10, style: .continuous).fill(color.opacity(0.05))
                     if let pct {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(color.opacity(0.28))
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(color.opacity(0.14))
                             .frame(width: geo.size.width * max(0, min(1, pct)))
                     }
                 }

@@ -36,6 +36,11 @@ public final class Transmitter: @unchecked Sendable {
 
     public var isConfigured: Bool { !token.isEmpty }
 
+    /// 服务器回传的规范设备名 (以 token 对应的注册名为准, 可能已被改名)。
+    /// 本地 deviceID 只是上报提示, 服务器并不采用 —— 风扇指令必须用规范名,
+    /// 否则服务器认不出设备直接 404。旧版服务器只回 "ok", 那就不会触发。
+    public var onDeviceName: ((String) -> Void)?
+
     /// 发送一条快照; 失败则缓存待补传
     public func send(_ snapshot: ProbeResult) {
         let ts = Int64(Date().timeIntervalSince1970)
@@ -101,6 +106,9 @@ public final class Transmitter: @unchecked Sendable {
         let task = Transmitter.session.dataTask(with: request) { data, response, error in
             if error == nil, let http = response as? HTTPURLResponse, http.statusCode == 200 {
                 success = true
+                if let data, let name = Transmitter.deviceName(from: data) {
+                    self.onDeviceName?(name)
+                }
             } else {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? -1
                 let err = error?.localizedDescription ?? "none"
@@ -115,6 +123,13 @@ public final class Transmitter: @unchecked Sendable {
             task.cancel()
         }
         return success
+    }
+
+    /// 从 /api/metrics 响应里取规范设备名。旧版服务器回的是纯文本 "ok", 取不到返回 nil
+    private static func deviceName(from data: Data) -> String? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        let name = obj["name"] as? String
+        return (name?.isEmpty == false) ? name : nil
     }
 
     private static func log(_ msg: String) {

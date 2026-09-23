@@ -27,6 +27,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false   // 关闭设置窗口后继续后台运行 (采集推送不停)
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // 退出前把本机风扇交还系统自动控制, 避免转速被锁死
+        AppModel.shutdownFanControl()
+    }
 }
 
 @main

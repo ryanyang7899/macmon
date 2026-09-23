@@ -29,6 +29,21 @@ final class AppModel: ObservableObject {
     // 本机回退视图的图表数据
     @Published var localHistory: [MonitorPoint] = []
 
+    /// 本机在服务器上的规范设备名 (由 /api/metrics 响应回传)。
+    /// 服务器以 token 对应的注册名为准, 而且随时可能被改名 —— 本地 config.deviceID
+    /// 只是上报提示, 服务器并不采用。拿本地名去发风扇指令会被判为"未知设备"而 404。
+    @Published var canonicalDeviceID: String?
+
+    /// 风扇指令里代表"本机"的设备名 (还没从服务器学到时先退回本地值)
+    var localDeviceName: String { canonicalDeviceID ?? config.deviceID }
+
+    /// 本机风扇控制组件 (root helper) 的安装与自检
+    let helper = HelperManager()
+    /// 远端风扇控制: 指令经服务器中转给被监控设备
+    let remoteFan = RemoteFanControl()
+    /// 接收服务器下发的风扇指令并调用本机 helper 执行
+    private var fanPoller: FanCommandPoller?
+
     private var timer: Timer?
     private var monitorTimer: Timer?
     private var transmitter: Transmitter?
@@ -71,12 +86,13 @@ final class AppModel: ObservableObject {
             log("init: 无有效配置, 跳过 start()")
         }
         self.isLaunchAtLogin = SMAppService.mainApp.status == .enabled
-        // 若已勾选被监控设备, 启动菜单栏监控轮询
+        // 监控轮询常驻: 即使没勾选被监控设备也要跑 —— 本机风扇指令的执行结果
+        // 靠它读回, 停掉的话风扇组件的"下发中"标记永远清不掉
         if let sel = config.monitorDevices, !sel.isEmpty {
             log("init: 已勾选被监控设备 \(sel.joined(separator: ",")), 启动监控轮询")
-            startMonitorTimer()
-            Task { await refreshMonitor() }
         }
+        startMonitorTimer()
+        Task { await refreshMonitor() }
         // 自动检查更新默认关闭, 由用户在设置中开启 (更新时机由用户决定)
         if config.autoUpdateCheck == true {
             checkForUpdates()
@@ -119,8 +135,19 @@ final class AppModel: ObservableObject {
     /// 拉取勾选设备的实时快照 (5s 轮询), 并追加到图表缓冲
     func refreshMonitor() async {
         let devices = config.monitorDevices ?? []
-        guard !devices.isEmpty, let base = config.serverURL, let url = URL(string: base),
+        guard let base = config.serverURL, let url = URL(string: base),
               let token = config.token, !token.isEmpty else {
+            monitorSnapshots = [:]
+            return
+        }
+        // 读回风扇指令的执行结果 (失败原因要显示在弹窗里)。
+        // 本机必须一并轮询: 它不一定在被监控列表里, 漏掉的话"下发中"标记永远清不掉,
+        // 转速会一直停在橙色。
+        var pollDevices = devices
+        if !pollDevices.contains(localDeviceName) { pollDevices.append(localDeviceName) }
+        remoteFan.pollResults(devices: pollDevices)
+
+        guard !devices.isEmpty else {
             monitorSnapshots = [:]
             return
         }
@@ -133,6 +160,7 @@ final class AppModel: ObservableObject {
             let (data, resp) = try await Self.monitorSession.data(for: req)
             guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else { return }
             self.monitorSnapshots = try JSONDecoder().decode([String: MonitorEntry].self, from: data)
+            // (风扇指令结果的轮询已在函数开头统一发起, 这里不再重复)
             // 追加图表缓冲
             for (name, entry) in monitorSnapshots {
                 if let d = entry.latest?.data {
@@ -182,13 +210,10 @@ final class AppModel: ObservableObject {
         config.monitorDevices = devices
         try? config.save()
         log("setMonitorSelection: \(devices.joined(separator: ","))")
-        if devices.isEmpty {
-            stopMonitorTimer()
-            monitorSnapshots = [:]
-        } else {
-            startMonitorTimer()
-            Task { await refreshMonitor() }
-        }
+        if devices.isEmpty { monitorSnapshots = [:] }
+        // 定时器常驻 (理由同 init: 本机风扇结果也要轮询)
+        startMonitorTimer()
+        Task { await refreshMonitor() }
     }
 
     /// 设置菜单栏显示条目, 持久化
@@ -308,8 +333,22 @@ final class AppModel: ObservableObject {
         log("start: url=\(url.absoluteString) token=\(token)")
         stop()
         transmitter = Transmitter(serverURL: url, token: token, deviceID: config.deviceID)
+        // 服务器会告知它眼里这台设备叫什么, 风扇指令必须用这个名字
+        transmitter?.onDeviceName = { [weak self] name in
+            Task { @MainActor in
+                guard let self, self.canonicalDeviceID != name else { return }
+                self.canonicalDeviceID = name
+                self.log("服务器规范设备名: \(name)")
+            }
+        }
         isConnected = true
         statusText = "已连接 · 采集中"
+
+        // 本机也是被监控设备之一: 接收服务器下发的风扇指令并本地执行
+        remoteFan.configure(serverURL: urlStr, token: token)
+        fanPoller = FanCommandPoller(serverURL: url, token: token, deviceID: config.deviceID)
+        fanPoller?.start()
+
         collectNow()
         let interval = max(2, config.interval)
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
@@ -320,6 +359,11 @@ final class AppModel: ObservableObject {
     func stop() {
         timer?.invalidate()
         timer = nil
+    }
+
+    /// 退出前调用: 把本机被远程强制过的风扇交还系统控制
+    nonisolated static func shutdownFanControl() {
+        FanCommandPoller.shutdownHelper()
     }
 
     func collectNow() {

@@ -2,7 +2,9 @@
 FROM golang:1.27-alpine AS build
 WORKDIR /src
 COPY go.mod ./
-COPY main.go ./
+# 通配而不是逐个列名: 早先按名列举时新增 fan.go 没被复制进去,
+# 本地编译通过、镜像里却缺文件, 直到构建才炸。
+COPY *.go ./
 COPY web/ ./web/
 # 纯标准库, 无 CGO, 静态编译
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /macmon-server .

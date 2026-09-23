@@ -91,6 +91,16 @@ ARGS="$ARGS
   <string>--out</string>
   <string>$LOG_FILE</string>"
 
+# ---- 重签名: 统一签名标识 ----
+# SwiftPM 默认给产物打的是 macmon-<hash> 这种自动标识, 而 root 的风扇控制
+# helper 只接受标识为 com.macmon.app 的对端, 系统会在建立 XPC 连接时直接拒绝。
+# 不改签名的话, 这个 agent 收到的远程风扇指令永远无法执行 (且报错含糊)。
+if [[ -f "$BINARY" ]]; then
+    echo "==> 重签名 agent 二进制 (identifier=com.macmon.app)"
+    codesign --force --sign - --identifier com.macmon.app "$BINARY"
+    xattr -c "$BINARY" 2>/dev/null || true
+fi
+
 cat > "$PLIST_DST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

@@ -65,6 +65,7 @@ type Store struct {
 	pending       map[string]*PendingDevice // ip|name -> 未注册设备
 	codes         map[string]PendingCode    // 注册码 -> 绑定信息
 	retentionDays int
+	fans          *fanQueue // 远程风扇控制命令队列 (自带锁, 见 fan.go)
 }
 
 type Device struct {
@@ -106,6 +107,7 @@ func NewStore(dir string, retentionDays int) (*Store, error) {
 		pending:       map[string]*PendingDevice{},
 		codes:         map[string]PendingCode{},
 		retentionDays: retentionDays,
+		fans:          newFanQueue(),
 	}
 	if err := os.MkdirAll(filepath.Join(dir, "history"), 0o755); err != nil {
 		return nil, err
@@ -809,6 +811,23 @@ func (s *Store) requireAgentAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// 允许 web 密码或任一 agent token 通过。
+// 风扇指令既可能来自浏览器看板 (web 密码), 也可能来自 App (设备 token)。
+func (s *Store) requireAnyAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if checkWebAuth(r) {
+			next(w, r)
+			return
+		}
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if _, ok := s.deviceByToken(token); ok {
+			next(w, r)
+			return
+		}
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	}
+}
+
 // ---------- main ----------
 
 func main() {
@@ -916,8 +935,10 @@ func main() {
 			return
 		}
 		store.touchDevice(device, preferIP(reportedIP, clientIP(r)))
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
+		// 回传规范设备名: 服务器以 token 对应的注册名为准, 且随时可能被改名,
+		// 客户端本地的 device_id 只是上报提示。App 拿本地名去发风扇指令会 404,
+		// 所以必须让它知道服务器眼里自己叫什么。
+		writeJSON(w, map[string]any{"name": device.Name})
 	})
 
 	// 设备管理 API (均需看板鉴权)
@@ -1068,6 +1089,104 @@ func main() {
 			out[name] = entry
 		}
 		writeJSON(w, out)
+	}))
+
+	// ---------- 远程风扇控制 ----------
+	//
+	// App 下发命令 -> 服务器入队 -> 被监控设备拉取执行 -> 回报结果。
+	// 被监控设备通常在 NAT 后, 无法直连, 所以只能由设备主动来取。
+
+	// App 下发: 指定设备名 + 风扇 + 动作
+	mux.HandleFunc("POST /api/fan/command", store.requireAnyAuth(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Device string `json:"device"`
+			FanID  int    `json:"fan_id"`
+			Action string `json:"action"`
+			RPM    int    `json:"rpm"`
+		}
+		defer r.Body.Close()
+		if json.NewDecoder(r.Body).Decode(&req) != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		if req.Action != "speed" && req.Action != "auto" && req.Action != "reset" {
+			http.Error(w, "unknown action", http.StatusBadRequest)
+			return
+		}
+		if req.Action == "speed" && req.RPM <= 0 {
+			http.Error(w, "rpm must be positive", http.StatusBadRequest)
+			return
+		}
+		d, ok := store.deviceByName(req.Device)
+		if !ok {
+			http.Error(w, "unknown device", http.StatusNotFound)
+			return
+		}
+		if d.Suspended {
+			http.Error(w, "device suspended", http.StatusConflict)
+			return
+		}
+		cmd := FanCommand{
+			ID:      fmt.Sprintf("%d-%d", time.Now().UnixNano(), req.FanID),
+			FanID:   req.FanID,
+			Action:  req.Action,
+			RPM:     req.RPM,
+			Created: time.Now().Unix(),
+		}
+		store.fans.enqueue(d.Name, cmd)
+		writeJSON(w, map[string]any{"queued": cmd.ID})
+	}))
+
+	// 设备拉取自己的待执行命令 (取走即清空)
+	mux.HandleFunc("GET /api/fan/commands", store.requireAgentAuth(func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		d, ok := store.deviceByToken(token)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		cmds := store.fans.take(d.Name)
+		if cmds == nil {
+			cmds = []FanCommand{}
+		}
+		writeJSON(w, cmds)
+	}))
+
+	// 设备回报执行结果
+	mux.HandleFunc("POST /api/fan/result", store.requireAgentAuth(func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		d, ok := store.deviceByToken(token)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		var res FanResult
+		defer r.Body.Close()
+		if json.NewDecoder(r.Body).Decode(&res) != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		res.At = time.Now().Unix()
+		store.fans.record(d.Name, res)
+		writeJSON(w, map[string]any{"ok": true})
+	}))
+
+	// App 读取某设备最近一次执行结果 (用于把失败原因显示出来)
+	mux.HandleFunc("GET /api/fan/state", store.requireAnyAuth(func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Query().Get("device")
+		if name == "" {
+			http.Error(w, "missing device", http.StatusBadRequest)
+			return
+		}
+		if _, ok := store.deviceByName(name); !ok {
+			http.Error(w, "unknown device", http.StatusNotFound)
+			return
+		}
+		if res, ok := store.fans.lastResult(name); ok {
+			writeJSON(w, res)
+			return
+		}
+		writeJSON(w, map[string]any{})
 	}))
 
 	// 历史数据留存天数 (管理页面可改)

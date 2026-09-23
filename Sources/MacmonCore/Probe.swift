@@ -26,6 +26,22 @@ public struct ProbeResult: Codable {
     public var battery: BatteryResult
     public var temps: [String: Double]
     public var fans: [String: Double]
+    /// 风扇控制能力上报: 远端据此判断"被监控设备是否装了辅助组件"。
+    /// 旧版本 macmon 不带这个字段, 解码后为 nil。
+    public var fanControl: FanCapability?
+
+    /// 本机是否具备远程风扇控制条件
+    public struct FanCapability: Codable {
+        /// 是否已安装 macmonhelper (root 组件)
+        public var helper: Bool
+        /// 组件协议版本, 与 App 期望不一致时提示更新
+        public var version: String
+
+        public init(helper: Bool, version: String) {
+            self.helper = helper
+            self.version = version
+        }
+    }
 
     public struct DeviceInfo: Codable {
         public var model: String
@@ -340,7 +356,11 @@ public func collectOnce(sampleIntervalSeconds: Double = 1.0) -> ProbeResult {
             acAdapterWatts: battery.acAdapterWatts
         ),
         temps: temps,
-        fans: fans
+        fans: fans,
+        fanControl: ProbeResult.FanCapability(
+            helper: HelperConnection.isInstalled,
+            version: MacmonHelper.version
+        )
     )
 }
 

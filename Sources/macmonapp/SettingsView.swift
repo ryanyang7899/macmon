@@ -29,6 +29,7 @@ struct SettingsView: View {
                     collectSection
                     monitorDevicesSection
                     monitorItemsSection
+                    FanControlSection(helper: model.helper)
                     systemSection
                     if let err = model.error {
                         Label(err, systemImage: "exclamationmark.triangle.fill")
